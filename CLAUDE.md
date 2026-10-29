@@ -24,7 +24,7 @@
   - `AudioContext.currentTime` 基準の先読みスケジュール(`Metronome.tick()` を毎フレーム呼び、先読み0.25秒分を予約)。setTimeout/setIntervalで鳴らさない: タイマー精度がそのまま拍のずれになるため
   - リードインは秒ではなく小節数(`LEAD_IN_BARS`=1)で持つ。秒固定だとBPM/倍率次第でカウントインが小節頭から始まらないため
 - 拍線: 小節頭は濃く、他の拍は薄い横線。ノーツと同じ `yOf(time, t)` で位置計算
-- 開始画面の設定(localStorage `djembe.settings`): 拍音ON/OFF・音量、拍線ON/OFF、速さ倍率(0.5/0.7/0.85/1.0)。`?speed=` 指定時はそれが優先(UIの速さ選択は無効化)。文字譜の警告も開始画面に表示
+- 開始画面の設定(localStorage `djembe.settings`): 拍音ON/OFF・音量、拍線ON/OFF、速さ倍率(スライダー0.5〜1.5・刻み0.05、横に「×0.85 (BPM 110)」表示。保存値は0.5〜1.5にクランプ)。`?speed=`(0.1〜4)指定時はそれが優先(スライダーは無効化し理由を表示)。文字譜の警告も開始画面に表示
 
 ## 譜面の内部形式
 `{ beat, sound, hand, flam }`

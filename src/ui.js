@@ -1,5 +1,5 @@
 import { OFFSET_MIN_MS, OFFSET_MAX_MS } from './constants.js';
-import { SPEED_OPTIONS } from './settings.js';
+import { SPEED_MIN, SPEED_MAX, SPEED_STEP } from './settings.js';
 
 /** @typedef {import('./types.js').Counts} Counts */
 /** @typedef {import('./settings.js').Settings} Settings */
@@ -72,21 +72,26 @@ export function createUi({ initialOffsetMs, onOffsetChange, settings, urlSpeed, 
   beatVol.addEventListener('input', () => update({ beatVolume: Number(beatVol.value) / 100 }));
   beatLines.addEventListener('change', () => update({ beatLines: beatLines.checked }));
 
-  const effectiveSpeed = urlSpeed ?? current.speed;
-  const speedBox = el('speed-options');
-  for (const v of SPEED_OPTIONS) {
-    const label = document.createElement('label');
-    label.className = 'pill';
-    const input = document.createElement('input');
-    input.type = 'radio';
-    input.name = 'speed';
-    input.value = String(v);
-    input.checked = v === effectiveSpeed;
-    input.disabled = urlSpeed !== null;
-    input.addEventListener('change', () => update({ speed: v }));
-    label.append(input, `×${v}`);
-    speedBox.append(label);
-  }
+  const speedSlider = /** @type {HTMLInputElement} */ (el('set-speed'));
+  const speedOutput = el('speed-output');
+  speedSlider.min = String(SPEED_MIN);
+  speedSlider.max = String(SPEED_MAX);
+  speedSlider.step = String(SPEED_STEP);
+  speedSlider.value = String(current.speed);
+  speedSlider.disabled = urlSpeed !== null;
+  /** 譜面BPM。読み込み完了(showSongInfo)まで不明 @type {number | null} */
+  let baseBpm = null;
+  /** 「×0.85 (BPM 110)」。URL指定時はスライダー範囲外の値もそのまま表示する */
+  const renderSpeed = () => {
+    const v = urlSpeed ?? current.speed;
+    speedOutput.textContent = `×${v}` + (baseBpm === null ? '' : ` (BPM ${Math.round(baseBpm * v)})`);
+  };
+  renderSpeed();
+  speedSlider.addEventListener('input', () => {
+    // 0.05刻みの小数誤差(0.8500000001)を丸めて保存する
+    update({ speed: Math.round(Number(speedSlider.value) * 100) / 100 });
+    renderSpeed();
+  });
   if (urlSpeed !== null) {
     const note = el('speed-note');
     note.textContent = `URLの ?speed=${urlSpeed} を使用中(設定より優先)`;
@@ -95,8 +100,10 @@ export function createUi({ initialOffsetMs, onOffsetChange, settings, urlSpeed, 
 
   return {
     /** 譜面の読み込み完了後に呼ぶ。警告は画面にも出す(console.warnだけだと気づけない) */
-    /** @param {{ title: string, warnings: NotationWarning[] }} info */
-    showSongInfo({ title: songTitle, warnings }) {
+    /** @param {{ title: string, bpm: number, warnings: NotationWarning[] }} info */
+    showSongInfo({ title: songTitle, bpm, warnings }) {
+      baseBpm = bpm;
+      renderSpeed();
       el('song-title').textContent = songTitle ? `♪ ${songTitle}` : '';
       const list = el('warnings');
       list.replaceChildren();

@@ -5,10 +5,13 @@
  * @property {boolean} beatOn 拍音
  * @property {number} beatVolume 拍音の音量 0..1
  * @property {boolean} beatLines 拍線
- * @property {number} speed 速さ倍率(SPEED_OPTIONSのいずれか)
+ * @property {number} speed 速さ倍率(SPEED_MIN〜SPEED_MAX)
  */
 
-export const SPEED_OPTIONS = Object.freeze([0.5, 0.7, 0.85, 1.0]);
+// 設定UIのスライダー範囲。?speed= の許容範囲(parseSpeedParam)はこれより広い
+export const SPEED_MIN = 0.5;
+export const SPEED_MAX = 1.5;
+export const SPEED_STEP = 0.05;
 
 /** @type {Readonly<Settings>} */
 export const DEFAULT_SETTINGS = Object.freeze({ beatOn: true, beatVolume: 0.6, beatLines: true, speed: 1.0 });
@@ -26,13 +29,13 @@ export function sanitizeSettings(raw) {
     beatOn: typeof r.beatOn === 'boolean' ? r.beatOn : d.beatOn,
     beatVolume: Math.min(1, Math.max(0, vol)),
     beatLines: typeof r.beatLines === 'boolean' ? r.beatLines : d.beatLines,
-    speed: SPEED_OPTIONS.includes(/** @type {number} */ (r.speed)) ? /** @type {number} */ (r.speed) : d.speed,
+    speed: typeof r.speed === 'number' && Number.isFinite(r.speed) ? Math.min(SPEED_MAX, Math.max(SPEED_MIN, r.speed)) : d.speed,
   };
 }
 
 /**
  * URLの ?speed= を数値にする。未指定・不正(0以下、極端な値)は null。
- * 選択肢以外(0.75など)も許す: 練習用に自由に指定できる。
+ * スライダー範囲外(0.2や2など)も許す: 練習用に自由に指定できる。
  * @param {string | null} param
  * @returns {number | null}
  */

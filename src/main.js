@@ -47,7 +47,7 @@ const ui = createUi({
   },
   onStart: () => void start(),
 });
-chartPromise.then((loaded) => ui.showSongInfo(loaded));
+chartPromise.then((loaded) => ui.showSongInfo({ ...loaded, bpm: loaded.chart.bpm }));
 
 async function start() {
   if (state === 'playing') return;
