@@ -22,49 +22,87 @@ export function sampleVoice(buffer) {
 }
 
 /**
- * 仮の合成音(ジャンベ風): サイン波のピッチ下降 + ノイズバースト。
+ * 合成ドラムの設計図。音程のある層(tones)とノイズ層(noises)を重ねる。
+ * tone: f0 → f1 へ指数的に下降(decay の6割で到達)し、decay で消える
+ * noise: ノイズをフィルタ(type/freq/q)に通し、decay で消える
+ * @typedef {{ f0: number, f1: number, decay: number, gain: number }} ToneLayer
+ * @typedef {{ type: BiquadFilterType, freq: number, q: number, decay: number, gain: number }} NoiseLayer
+ * @typedef {{ tones: ToneLayer[], noises: NoiseLayer[] }} DrumParams
+ */
+
+/** 仮の合成音のパラメータ。音色を変えるときはここを編集する(dev/sound-test.html で試聴できる) @type {Record<Sound, DrumParams>} */
+export const DRUM_PARAMS = {
+  high: {
+    tones: [{ f0: 950, f1: 700, decay: 0.09, gain: 0.3 }],
+    noises: [{ type: 'highpass', freq: 2500, q: 1, decay: 0.07, gain: 0.5 }],
+  },
+  mid: {
+    tones: [{ f0: 340, f1: 250, decay: 0.2, gain: 0.6 }],
+    noises: [{ type: 'bandpass', freq: 1200, q: 1, decay: 0.05, gain: 0.2 }],
+  },
+  low: {
+    tones: [{ f0: 150, f1: 55, decay: 0.4, gain: 0.95 }],
+    noises: [{ type: 'lowpass', freq: 400, q: 1, decay: 0.04, gain: 0.25 }],
+  },
+};
+
+/**
+ * ノイズ素材。1回だけ生成して使い回す(毎打生成するとGC/CPU負荷になる)
+ * @param {BaseAudioContext} ctx
+ */
+export function createNoiseBuffer(ctx) {
+  const buf = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  return buf;
+}
+
+/**
+ * @param {AudioBuffer} noiseBuf
+ * @param {DrumParams} p
+ * @returns {Voice}
+ */
+export function drumVoice(noiseBuf, p) {
+  return (ctx, when, dest) => {
+    for (const t of p.tones) {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.frequency.setValueAtTime(t.f0, when);
+      osc.frequency.exponentialRampToValueAtTime(t.f1, when + t.decay * 0.6);
+      g.gain.setValueAtTime(t.gain, when);
+      g.gain.exponentialRampToValueAtTime(0.001, when + t.decay);
+      osc.connect(g).connect(dest);
+      osc.start(when);
+      osc.stop(when + t.decay + 0.05);
+    }
+    for (const n of p.noises) {
+      const src = ctx.createBufferSource();
+      const f = ctx.createBiquadFilter();
+      const g = ctx.createGain();
+      src.buffer = noiseBuf;
+      f.type = n.type;
+      f.frequency.value = n.freq;
+      f.Q.value = n.q;
+      g.gain.setValueAtTime(n.gain, when);
+      g.gain.exponentialRampToValueAtTime(0.001, when + n.decay);
+      src.connect(f).connect(g).connect(dest);
+      src.start(when);
+      src.stop(when + n.decay + 0.05);
+    }
+  };
+}
+
+/**
+ * 仮の合成音(ジャンベ風)。
  * @param {AudioContext} ctx
  * @returns {Record<Sound, Voice>}
  */
 export function createSynthVoices(ctx) {
-  // ノイズは1回だけ生成して使い回す(毎打生成するとGC/CPU負荷になる)
-  const noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate);
-  const data = noiseBuf.getChannelData(0);
-  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-
-  /**
-   * @param {{ f0: number, f1: number, toneDecay: number, toneGain: number,
-   *           noiseType: BiquadFilterType, noiseFreq: number, noiseDecay: number, noiseGain: number }} p
-   * @returns {Voice}
-   */
-  const make = (p) => (c, when, dest) => {
-    const osc = c.createOscillator();
-    const og = c.createGain();
-    osc.frequency.setValueAtTime(p.f0, when);
-    osc.frequency.exponentialRampToValueAtTime(p.f1, when + p.toneDecay * 0.6);
-    og.gain.setValueAtTime(p.toneGain, when);
-    og.gain.exponentialRampToValueAtTime(0.001, when + p.toneDecay);
-    osc.connect(og).connect(dest);
-    osc.start(when);
-    osc.stop(when + p.toneDecay + 0.05);
-
-    const ns = c.createBufferSource();
-    const nf = c.createBiquadFilter();
-    const ng = c.createGain();
-    ns.buffer = noiseBuf;
-    nf.type = p.noiseType;
-    nf.frequency.value = p.noiseFreq;
-    ng.gain.setValueAtTime(p.noiseGain, when);
-    ng.gain.exponentialRampToValueAtTime(0.001, when + p.noiseDecay);
-    ns.connect(nf).connect(ng).connect(dest);
-    ns.start(when);
-    ns.stop(when + p.noiseDecay + 0.05);
-  };
-
+  const noiseBuf = createNoiseBuffer(ctx);
   return {
-    high: make({ f0: 950, f1: 700, toneDecay: 0.09, toneGain: 0.3, noiseType: 'highpass', noiseFreq: 2500, noiseDecay: 0.07, noiseGain: 0.5 }),
-    mid: make({ f0: 340, f1: 250, toneDecay: 0.2, toneGain: 0.6, noiseType: 'bandpass', noiseFreq: 1200, noiseDecay: 0.05, noiseGain: 0.2 }),
-    low: make({ f0: 150, f1: 55, toneDecay: 0.4, toneGain: 0.95, noiseType: 'lowpass', noiseFreq: 400, noiseDecay: 0.04, noiseGain: 0.25 }),
+    high: drumVoice(noiseBuf, DRUM_PARAMS.high),
+    mid: drumVoice(noiseBuf, DRUM_PARAMS.mid),
+    low: drumVoice(noiseBuf, DRUM_PARAMS.low),
   };
 }
 

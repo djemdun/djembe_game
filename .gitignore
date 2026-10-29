@@ -3,3 +3,5 @@ node_modules/
 *.log
 .vscode/
 .idea/
+# 試聴ページなどの開発用ツール(公開しない)
+dev/
