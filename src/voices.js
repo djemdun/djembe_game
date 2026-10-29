@@ -41,7 +41,7 @@ export const DRUM_PARAMS = {
     ],
   },
   mid: {
-    tones: [{ f0: 340, f1: 250, decay: 0.2, gain: 0.6 }],
+    tones: [{ f0: 300, f1: 220, decay: 0.2, gain: 0.6 }], // 高音との差を出すため 340→250Hz から下げた
     noises: [{ type: 'bandpass', freq: 1200, q: 1, decay: 0.05, gain: 0.2 }],
   },
   low: {
