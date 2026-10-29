@@ -32,9 +32,13 @@ export function sampleVoice(buffer) {
 
 /** 仮の合成音のパラメータ。音色を変えるときはここを編集する(dev/sound-test.html で試聴できる) @type {Record<Sound, DrumParams>} */
 export const DRUM_PARAMS = {
+  // 木の太鼓らしい太さを優先した音(試聴ページのプリセット7をもとに調整)。以前は 950→700Hz のサイン波 + 2500Hz以上のノイズ
   high: {
-    tones: [{ f0: 950, f1: 700, decay: 0.09, gain: 0.3 }],
-    noises: [{ type: 'highpass', freq: 2500, q: 1, decay: 0.07, gain: 0.5 }],
+    tones: [{ f0: 440, f1: 340, decay: 0.2, gain: 0.8 }],
+    noises: [
+      { type: 'bandpass', freq: 650, q: 5, decay: 0.12, gain: 0.5 },
+      { type: 'highpass', freq: 3000, q: 1, decay: 0.02, gain: 0.3 },
+    ],
   },
   mid: {
     tones: [{ f0: 340, f1: 250, decay: 0.2, gain: 0.6 }],
