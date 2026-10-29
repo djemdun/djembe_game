@@ -31,21 +31,37 @@ test('sectionsが無い譜面(demo/easy)では空', () => {
   assert.deepEqual(sectionLabels({ bpm: 120, beatsPerBar: 4, totalBeats: 4, notes: [] }, 2), []);
 });
 
+test('表示の長さは文字譜1行分(2小節)の演奏時間で、BPM・倍率に追従する', () => {
+  const dur = (c) => sectionLabels(c, 0)[0].duration;
+  const base = chart([{ beat: 0, name: 'A' }]); // 120BPM: 8拍 = 4秒
+  near(dur(base), 4);
+  near(dur(withSpeed(base, 0.5)), 8);
+  near(dur(withSpeed(base, 1.5)), 4 / 1.5);
+  near(dur({ ...base, bpm: 130 }), 8 * 60 / 130);
+  near(dur({ ...base, bpm: 1000 }), 0.8); // 極端に速いときはフェード合計が下限
+});
+
 test('labelAlpha: フェードイン → 保持 → フェードアウト → 消える', () => {
-  assert.equal(labelAlpha(-0.1), 0);
-  assert.equal(labelAlpha(0), 0);
-  near(labelAlpha(0.15), 0.5);
-  assert.equal(labelAlpha(0.3), 1);
-  assert.equal(labelAlpha(1.4), 1);
-  near(labelAlpha(1.5 + 0.25), 0.5);
-  assert.equal(labelAlpha(2.0), 0);
-  assert.equal(labelAlpha(5), 0);
+  const D = 4;
+  assert.equal(labelAlpha(-0.1, D), 0);
+  assert.equal(labelAlpha(0, D), 0);
+  near(labelAlpha(0.15, D), 0.5);
+  assert.equal(labelAlpha(0.3, D), 1);
+  assert.equal(labelAlpha(3.4, D), 1); // 保持は 4 - 0.5 まで
+  near(labelAlpha(3.75, D), 0.5);
+  assert.equal(labelAlpha(4, D), 0);
+  assert.equal(labelAlpha(9, D), 0);
 });
 
 test('activeLabel: 表示期間中だけ返し、重なるときは後のラベルを優先', () => {
-  const labels = sectionLabels(chart([{ beat: 0, name: 'A' }, { beat: 2, name: 'B' }]), 5); // 5秒と6秒開始
+  const labels = sectionLabels(chart([{ beat: 0, name: 'A' }, { beat: 2, name: 'B' }]), 5); // 5秒と6秒開始。長さ各4秒
   assert.equal(activeLabel(labels, 0.1), null); // A の表示開始(5-1.6=3.4)の前
   assert.equal(activeLabel(labels, 3.4 + 0.5).name, 'A');
   assert.equal(activeLabel(labels, 4.4 + 0.5).name, 'B'); // B(showAt 4.4)が始まった後
+  assert.equal(activeLabel(labels, 4.4 + 3.9).name, 'B');
   assert.equal(activeLabel(labels, 20), null);
+  // 単独のラベルは 3.4 + 4 秒で消える
+  const one = sectionLabels(chart([{ beat: 0, name: 'A' }]), 5);
+  assert.equal(activeLabel(one, 3.4 + 3.9).name, 'A');
+  assert.equal(activeLabel(one, 3.4 + 4.0), null);
 });

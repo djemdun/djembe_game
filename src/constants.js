@@ -39,9 +39,12 @@ export const FALL_SEC = 1.6;
 export const LEAD_IN_BARS = 1;
 /** メトロノームの先読み幅(秒)。フレームが多少詰まっても次の拍を取りこぼさない長さ */
 export const METRONOME_LOOKAHEAD_SEC = 0.25;
-/** セクション名表示: ノーツが上から降り始める頃(= 開始の FALL_SEC 前)に、フェードイン→保持→フェードアウト */
+/**
+ * セクション名表示: ノーツが上から降り始める頃(= 開始の FALL_SEC 前)に、フェードイン→保持→フェードアウト。
+ * 全体の長さは文字譜の1行分(= SECTION_LABEL_BARS 小節)の演奏時間で、BPM・速さ倍率に追従する
+ */
+export const SECTION_LABEL_BARS = 2;
 export const SECTION_FADE_IN_SEC = 0.3;
-export const SECTION_HOLD_SEC = 1.2;
 export const SECTION_FADE_OUT_SEC = 0.5;
 /** 最後のノーツ後、リザルトへ移るまでの余韻 */
 export const END_PAD_SEC = 1;
