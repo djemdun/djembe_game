@@ -26,6 +26,17 @@ export function beatToSec(beat, bpm) {
 }
 
 /**
+ * 速さ倍率(1 = 譜面どおり)。beatは触らずBPMだけを変えるので、時刻の計算は従来のまま。
+ * @param {Chart} chart
+ * @param {number} rate
+ * @returns {Chart}
+ */
+export function withSpeed(chart, rate) {
+  if (!(rate > 0) || !Number.isFinite(rate)) throw new Error(`invalid speed: ${rate}`);
+  return { ...chart, bpm: chart.bpm * rate };
+}
+
+/**
  * フラムを「前打音(反対の手) + 着地音」の2ノーツに展開する。
  * 1ノーツ表示に変える場合はここだけを差し替える。
  * @param {ChartNote[]} notes

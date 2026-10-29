@@ -31,7 +31,7 @@
   - レーンは `LANES` 定義(hand + sound → lane)から導出
 - flam:true の `hand` は「着地側(2音目)の手」。直前(`FLAM_GAP_BEATS` 前)に反対の手の前打音を1つ足す(= 2つの近接ノーツ)。将来1ノーツ表示にする場合は `expandFlams` だけを変更する
 
-## 文字譜の仕様(段階4で実装。段階1〜3では未実装)
+## 文字譜の仕様(段階4で実装済み: `src/notation.js`)
 - ド=低音、ト=中音、タ=高音、ロ=中音フラム、ラ=高音フラム、ッ=休符
 - 1文字=8分音符、1小節=8文字、1行=16文字(2小節)
 - 行の文字数が16でなければ警告を出す
@@ -41,6 +41,8 @@
 - 食い(前の小節にはみ出す音)も、書かれた位置の奇偶で手を決める
 - フラム(ロ・ラ)は位置が奇数なら「右→左」、偶数なら「左→右」の2音
 - 手の例外指定は将来追加する。自動割り当てを上書きできる設計にしておく
+- 実装メモ: 1行の期待文字数は `拍子×4`(拍子4なら16)。警告は `{line, message}` で返し、読み込みは続行する。BPM不正・パート外の譜面は例外。`#` 始まりの行はコメント。x8 は `x`/`X`/`×` を受ける
+- 手の割り当ては `assignHand(pos, flam)` に集約(例外指定を足すときはここを呼ぶ側で上書き)。フラムの internal `hand` は本音側
 - テスト曲: `songs/djole.txt`(合図→伴奏x8→合図→ショフ→合図、BPM130、全30小節)
 
 ## コード構成の方針
@@ -55,7 +57,9 @@ index.html / style.css / jsconfig.json
 src/
   types.js      JSDoc typedef のみ
   constants.js  レーン定義・判定窓・スコア・曲ランク基準・タイミング定数
-  chart.js      内部形式 → 再生用ノーツ(純粋)
+  chart.js      内部形式 → 再生用ノーツ、withSpeed(速さ倍率)(純粋)
+  notation.js   文字譜 → 内部形式 + 警告(純粋)
+  chartLoader.js URLパラメータから譜面を用意(fetchあり)
   judge.js      判定窓/曲ランク(純粋)
   game.js       ゲーム状態(スコア/コンボ/判定)。時刻は引数
   voices.js     合成音 Voice と sampleVoice(録音差し替え用)
@@ -67,11 +71,12 @@ src/
   main.js       状態遷移とrAFループ
   data/demoChart.js  仮譜面(約30秒、内部形式)
   data/easyChart.js  判定確認用の易しい譜面(BPM60、20ノーツ)
-  data/charts.js     譜面レジストリ(URL ?chart=easy / ?chart=demo で切替)
-songs/djole.txt 文字譜(段階4で使用)
+  data/charts.js     譜面レジストリ。URL ?chart=djole(既定) / easy / demo、?speed=0.75 で速さ倍率
+tests/notation.test.js  node:test
+songs/djole.txt 文字譜(デフォルトで読み込まれる)
 ```
 
 ## 進捗
 - [x] 段階1〜3: 画面、入力と判定、リザルト、オフセットUI(仮譜面)
-- [ ] 段階4: 文字譜パーサ + node:test
+- [x] 段階4: 文字譜パーサ(`src/notation.js`) + node:test(`npm test` = `node --test`)
 - [ ] 以降: 録音音源への差し替え、手の例外指定、フラム1ノーツ表示、公開

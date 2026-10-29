@@ -7,15 +7,11 @@ import { attachInput } from './input.js';
 import { Renderer } from './renderer.js';
 import { loadOffsetMs, saveOffsetMs } from './storage.js';
 import { createUi } from './ui.js';
-import { CHARTS, DEFAULT_CHART_KEY } from './data/charts.js';
-
-const requestedKey = new URLSearchParams(location.search).get('chart') ?? DEFAULT_CHART_KEY;
-if (!(requestedKey in CHARTS)) {
-  console.warn(`unknown chart "${requestedKey}" (available: ${Object.keys(CHARTS).join(', ')}); using ${DEFAULT_CHART_KEY}`);
-}
-const chart = CHARTS[requestedKey] ?? CHARTS[DEFAULT_CHART_KEY];
+import { loadChart } from './chartLoader.js';
 
 const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('game'));
+/** 起動時に読み込みを開始。開始ボタンまでに終わっていれば待ち時間なし */
+const chartPromise = loadChart(new URLSearchParams(location.search));
 const audio = new AudioEngine();
 const renderer = new Renderer(canvas);
 
@@ -40,6 +36,7 @@ async function start() {
   if (state === 'playing') return;
   // unlock()はクリックハンドラ内で同期的に呼ぶ(autoplay制限)。awaitはその後。
   await audio.unlock();
+  const chart = await chartPromise;
   game = new Game(buildPlayNotes(chart, LEAD_IN_SEC));
   game.offsetSec = offsetMs / 1000;
   startTime = audio.now;
