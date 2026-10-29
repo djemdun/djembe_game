@@ -1,6 +1,8 @@
 import { LANES, LANE_COUNT, FALL_SEC } from './constants.js';
+import { beatsInWindow } from './beats.js';
 
 /** @typedef {import('./game.js').Game} Game */
+/** @typedef {import('./beats.js').BeatGrid} BeatGrid */
 
 const MAX_LANES_WIDTH = 720;
 const JUDGE_Y_RATIO = 0.8;
@@ -49,10 +51,20 @@ export class Renderer {
   }
 
   /**
+   * 時刻→y座標。ノーツと拍線で同じ式を使い、両者がずれないようにする。
+   * @param {number} time 対象の曲時間(秒)
+   * @param {number} t 現在の曲時間(秒)
+   */
+  yOf(time, t) {
+    return this.judgeY - ((time - t) / FALL_SEC) * this.judgeY;
+  }
+
+  /**
    * @param {Game} game
    * @param {number} t 曲時間(秒)。ノーツ位置はオフセット抜きの素の時間で描く
+   * @param {BeatGrid | null} grid 拍線の格子。null なら描かない
    */
-  draw(game, t) {
+  draw(game, t, grid) {
     const g = this.g;
     const { x0, laneW, judgeY, cssW, cssH } = this;
     const areaW = laneW * LANE_COUNT;
@@ -90,6 +102,19 @@ export class Renderer {
     g.lineTo(x0 + areaW / 2, cssH);
     g.stroke();
 
+    // 拍線(ノーツより下に描く。小節頭は濃く、他の拍は薄く)
+    if (grid) {
+      for (const b of beatsInWindow(grid, t - 0.4, t + FALL_SEC + 0.1)) {
+        const y = Math.round(this.yOf(b.time, t)) + 0.5;
+        g.strokeStyle = b.accent ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)';
+        g.lineWidth = b.accent ? 2 : 1;
+        g.beginPath();
+        g.moveTo(x0, y);
+        g.lineTo(x0 + areaW, y);
+        g.stroke();
+      }
+    }
+
     // ノーツ(時刻順なので、画面外の未来に来たらbreak)
     const r = Math.min(laneW * 0.36, 28);
     for (const n of game.notes) {
@@ -97,7 +122,7 @@ export class Renderer {
       if (dt > FALL_SEC + 0.1) break;
       if (dt < -0.4) continue;
       if (n.result && n.result !== 'MISSED') continue;
-      const y = judgeY - (dt / FALL_SEC) * judgeY;
+      const y = this.yOf(n.time, t);
       const cx = x0 + (n.lane + 0.5) * laneW;
       g.globalAlpha = n.result === 'MISSED' ? 0.3 : 1;
       g.fillStyle = n.result === 'MISSED' ? '#777' : SOUND_COLOR[n.sound];

@@ -31,4 +31,4 @@ BARS.forEach((bar, barIdx) => {
 });
 
 /** @type {Chart} 130BPM × 16小節 ≒ 29.5秒 */
-export const demoChart = { bpm: 130, notes };
+export const demoChart = { bpm: 130, beatsPerBar: 4, totalBeats: BARS.length * 4, notes };

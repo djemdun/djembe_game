@@ -20,11 +20,16 @@
 - 時間管理はWeb Audio APIの `currentTime` を基準にする(setTimeoutやDate.nowは基準にしない)
 - 「タップして開始」ボタンでAudioContextを開始する(モバイルのautoplay制限対応)
 - 描画はcanvasとrequestAnimationFrame
+- 拍音(メトロノーム): 4分音符ごと、小節頭は高め・強め。ジャンベと聞き分けやすい非ノイズのベル系合成音(`playClick`)。判定・スコアには関与せず、判定オフセットも掛けない。速さ倍率に追従。リードイン中も鳴らす(カウントイン)
+  - `AudioContext.currentTime` 基準の先読みスケジュール(`Metronome.tick()` を毎フレーム呼び、先読み0.25秒分を予約)。setTimeout/setIntervalで鳴らさない: タイマー精度がそのまま拍のずれになるため
+  - リードインは秒ではなく小節数(`LEAD_IN_BARS`=1)で持つ。秒固定だとBPM/倍率次第でカウントインが小節頭から始まらないため
+- 拍線: 小節頭は濃く、他の拍は薄い横線。ノーツと同じ `yOf(time, t)` で位置計算
+- 開始画面の設定(localStorage `djembe.settings`): 拍音ON/OFF・音量、拍線ON/OFF、速さ倍率(0.5/0.7/0.85/1.0)。`?speed=` 指定時はそれが優先(UIの速さ選択は無効化)。文字譜の警告も開始画面に表示
 
 ## 譜面の内部形式
 `{ beat, sound, hand, flam }`
 - sound: `high` / `mid` / `low`、hand: `L` / `R`、flam: boolean
-- `Chart = { bpm, notes: ChartNote[] }`
+- `Chart = { bpm, beatsPerBar, totalBeats, notes: ChartNote[] }`(beatsPerBar/totalBeats は拍音・拍線の格子用。速さ倍率は bpm にだけ掛かる)
 - ゲーム本体は内部形式だけを読む。文字譜は変換して内部形式にする
 - 判定側(ノーツの時刻・レーン)は文字譜の仕様変更の影響を受けない構造にする
   - `chart.js` の `buildPlayNotes` が内部形式 → `{time, lane, sound, result}` に変換する唯一の場所
@@ -49,7 +54,7 @@
 - 譜面の変換処理(文字譜→内部形式)は、DOMやWeb Audioに依存しない純粋関数として分離する
 - 変換処理にはNode標準の `node:test` でユニットテストを書く(追加パッケージ不要。段階4で実施)
 - テスト対象: 手の割り当て、フラムの偶奇、繰り返し、行の文字数チェック
-- 純粋ロジック(`chart.js` / `judge.js` / `constants.js`)はDOM・AudioContextに触れない。`game.js` も時刻を引数で受け取り、自前で時計を持たない
+- 純粋ロジック(`chart.js` / `beats.js` / `notation.js` / `settings.js` / `judge.js` / `constants.js`)はDOM・AudioContextに触れない。`game.js` も時刻を引数で受け取り、自前で時計を持たない
 
 ## ファイル構成
 ```
@@ -58,25 +63,29 @@ src/
   types.js      JSDoc typedef のみ
   constants.js  レーン定義・判定窓・スコア・曲ランク基準・タイミング定数
   chart.js      内部形式 → 再生用ノーツ、withSpeed(速さ倍率)(純粋)
+  beats.js      拍の時刻計算 gridOf/leadInSec/beatsInWindow(純粋。拍音と拍線が共用)
+  settings.js   設定の型・既定値・検証、?speed=の解釈(純粋)
+  metronome.js  拍音の先読みスケジューラ
   notation.js   文字譜 → 内部形式 + 警告(純粋)
-  chartLoader.js URLパラメータから譜面を用意(fetchあり)
+  chartLoader.js ?chart= から譜面を用意(fetchあり)。失敗時はdemo+警告
   judge.js      判定窓/曲ランク(純粋)
   game.js       ゲーム状態(スコア/コンボ/判定)。時刻は引数
   voices.js     合成音 Voice と sampleVoice(録音差し替え用)
   audio.js      AudioEngine(unlock / 再生)
   input.js      キーボード + Pointer Events
   renderer.js   canvas描画、レイアウト、座標→レーン
-  storage.js    オフセットのlocalStorage(try/catch済み)
+  storage.js    オフセット・設定のlocalStorage(try/catch済み)
   ui.js         開始/リザルト/オフセットのDOM
   main.js       状態遷移とrAFループ
   data/demoChart.js  仮譜面(約30秒、内部形式)
   data/easyChart.js  判定確認用の易しい譜面(BPM60、20ノーツ)
   data/charts.js     譜面レジストリ。URL ?chart=djole(既定) / easy / demo、?speed=0.75 で速さ倍率
-tests/notation.test.js  node:test
+tests/*.test.js  node:test(notation / beats / settings)
 songs/djole.txt 文字譜(デフォルトで読み込まれる)
 ```
 
 ## 進捗
 - [x] 段階1〜3: 画面、入力と判定、リザルト、オフセットUI(仮譜面)
 - [x] 段階4: 文字譜パーサ(`src/notation.js`) + node:test(`npm test` = `node --test`)
+- [x] 拍音・拍線・開始画面の設定UI・警告表示(拍の計算とsettingsはnode:test済み。音とUIは実機未確認)
 - [ ] 以降: 録音音源への差し替え、手の例外指定、フラム1ノーツ表示、公開

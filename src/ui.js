@@ -1,6 +1,11 @@
 import { OFFSET_MIN_MS, OFFSET_MAX_MS } from './constants.js';
+import { SPEED_OPTIONS } from './settings.js';
 
 /** @typedef {import('./types.js').Counts} Counts */
+/** @typedef {import('./settings.js').Settings} Settings */
+/** @typedef {import('./notation.js').NotationWarning} NotationWarning */
+
+const MAX_WARNINGS_SHOWN = 8;
 
 /** @param {string} id */
 function el(id) {
@@ -10,16 +15,23 @@ function el(id) {
 }
 
 /**
- * 開始/リザルト/オフセット調整のDOM。ゲーム状態は持たない。
- * @param {{ initialOffsetMs: number, onOffsetChange: (ms: number) => void, onStart: () => void }} p
+ * 開始/リザルト/設定/オフセット調整のDOM。ゲーム状態は持たない。
+ * @param {object} p
+ * @param {number} p.initialOffsetMs
+ * @param {(ms: number) => void} p.onOffsetChange
+ * @param {Settings} p.settings
+ * @param {number | null} p.urlSpeed URLの ?speed=。指定があれば設定の速さより優先される
+ * @param {(s: Settings) => void} p.onSettingsChange
+ * @param {() => void} p.onStart
  */
-export function createUi({ initialOffsetMs, onOffsetChange, onStart }) {
+export function createUi({ initialOffsetMs, onOffsetChange, settings, urlSpeed, onSettingsChange, onStart }) {
   const overlay = el('overlay');
   const title = el('screen-title');
   const result = el('screen-result');
   const slider = /** @type {HTMLInputElement} */ (el('offset-slider'));
   const output = el('offset-output');
 
+  // --- オフセット ---
   slider.min = String(OFFSET_MIN_MS);
   slider.max = String(OFFSET_MAX_MS);
 
@@ -38,7 +50,68 @@ export function createUi({ initialOffsetMs, onOffsetChange, onStart }) {
   el('start-btn').addEventListener('click', onStart);
   el('retry-btn').addEventListener('click', onStart);
 
+  // --- 設定(拍音・拍線・速さ) ---
+  let current = { ...settings };
+  const beatOn = /** @type {HTMLInputElement} */ (el('set-beat-on'));
+  const beatVol = /** @type {HTMLInputElement} */ (el('set-beat-vol'));
+  const beatLines = /** @type {HTMLInputElement} */ (el('set-beat-lines'));
+  beatOn.checked = current.beatOn;
+  beatVol.value = String(Math.round(current.beatVolume * 100));
+  beatVol.disabled = !current.beatOn;
+  beatLines.checked = current.beatLines;
+
+  /** @param {Partial<Settings>} patch */
+  const update = (patch) => {
+    current = { ...current, ...patch };
+    onSettingsChange({ ...current });
+  };
+  beatOn.addEventListener('change', () => {
+    beatVol.disabled = !beatOn.checked;
+    update({ beatOn: beatOn.checked });
+  });
+  beatVol.addEventListener('input', () => update({ beatVolume: Number(beatVol.value) / 100 }));
+  beatLines.addEventListener('change', () => update({ beatLines: beatLines.checked }));
+
+  const effectiveSpeed = urlSpeed ?? current.speed;
+  const speedBox = el('speed-options');
+  for (const v of SPEED_OPTIONS) {
+    const label = document.createElement('label');
+    label.className = 'pill';
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'speed';
+    input.value = String(v);
+    input.checked = v === effectiveSpeed;
+    input.disabled = urlSpeed !== null;
+    input.addEventListener('change', () => update({ speed: v }));
+    label.append(input, `×${v}`);
+    speedBox.append(label);
+  }
+  if (urlSpeed !== null) {
+    const note = el('speed-note');
+    note.textContent = `URLの ?speed=${urlSpeed} を使用中(設定より優先)`;
+    note.hidden = false;
+  }
+
   return {
+    /** 譜面の読み込み完了後に呼ぶ。警告は画面にも出す(console.warnだけだと気づけない) */
+    /** @param {{ title: string, warnings: NotationWarning[] }} info */
+    showSongInfo({ title: songTitle, warnings }) {
+      el('song-title').textContent = songTitle ? `♪ ${songTitle}` : '';
+      const list = el('warnings');
+      list.replaceChildren();
+      for (const w of warnings.slice(0, MAX_WARNINGS_SHOWN)) {
+        const li = document.createElement('li');
+        li.textContent = w.line > 0 ? `行${w.line}: ${w.message}` : w.message;
+        list.append(li);
+      }
+      if (warnings.length > MAX_WARNINGS_SHOWN) {
+        const li = document.createElement('li');
+        li.textContent = `…ほか${warnings.length - MAX_WARNINGS_SHOWN}件(コンソール参照)`;
+        list.append(li);
+      }
+      list.hidden = warnings.length === 0;
+    },
     showTitle() {
       title.hidden = false;
       result.hidden = true;

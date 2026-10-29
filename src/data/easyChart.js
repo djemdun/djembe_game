@@ -12,4 +12,4 @@ const notes = Array.from({ length: 20 }, (_, i) => ({
 }));
 
 /** @type {Chart} */
-export const easyChart = { bpm: 60, notes };
+export const easyChart = { bpm: 60, beatsPerBar: 4, totalBeats: 20, notes };

@@ -67,3 +67,27 @@ export function createSynthVoices(ctx) {
     low: make({ f0: 150, f1: 55, toneDecay: 0.4, toneGain: 0.95, noiseType: 'lowpass', noiseFreq: 400, noiseDecay: 0.04, noiseGain: 0.25 }),
   };
 }
+
+/**
+ * 拍音(メトロノーム)のクリック。ジャンベ3音と聞き分けるため、
+ * 打楽器のノイズ成分を持たない「高めの短いベル音」(基音 + 非整数倍音)にする。
+ * 小節頭(accent)は音程を上げて音量も上げる。
+ * @param {AudioContext} ctx
+ * @param {number} when
+ * @param {AudioNode} dest
+ * @param {boolean} accent
+ */
+export function playClick(ctx, when, dest, accent) {
+  const f = accent ? 2600 : 1900;
+  const peak = accent ? 0.5 : 0.3;
+  for (const [mult, amp] of /** @type {const} */ ([[1, 1], [2.76, 0.35]])) {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.frequency.value = f * mult;
+    g.gain.setValueAtTime(peak * amp, when);
+    g.gain.exponentialRampToValueAtTime(0.001, when + 0.06);
+    osc.connect(g).connect(dest);
+    osc.start(when);
+    osc.stop(when + 0.08);
+  }
+}

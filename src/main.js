@@ -1,27 +1,37 @@
-import { LANES, LEAD_IN_SEC } from './constants.js';
+import { LANES } from './constants.js';
 import { AudioEngine } from './audio.js';
-import { buildPlayNotes } from './chart.js';
+import { buildPlayNotes, withSpeed } from './chart.js';
+import { gridOf, leadInSec } from './beats.js';
+import { Metronome } from './metronome.js';
+import { parseSpeedParam } from './settings.js';
 import { Game } from './game.js';
 import { accuracy, songRank } from './judge.js';
 import { attachInput } from './input.js';
 import { Renderer } from './renderer.js';
-import { loadOffsetMs, saveOffsetMs } from './storage.js';
+import { loadOffsetMs, saveOffsetMs, loadSettings, saveSettings } from './storage.js';
 import { createUi } from './ui.js';
 import { loadChart } from './chartLoader.js';
 
 const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('game'));
 /** 起動時に読み込みを開始。開始ボタンまでに終わっていれば待ち時間なし */
-const chartPromise = loadChart(new URLSearchParams(location.search));
+const params = new URLSearchParams(location.search);
+const urlSpeed = parseSpeedParam(params.get('speed'));
+const chartPromise = loadChart(params);
 const audio = new AudioEngine();
 const renderer = new Renderer(canvas);
 
 let offsetMs = loadOffsetMs();
+let settings = loadSettings();
 /** @type {'title' | 'playing' | 'result'} */
 let state = 'title';
 /** @type {Game | null} */
 let game = null;
 /** 曲時間0のAudioContext時間。songTime = audio.now - startTime */
 let startTime = 0;
+/** @type {Metronome | null} */
+let metronome = null;
+/** @type {import('./beats.js').BeatGrid | null} */
+let beatGrid = null;
 
 const ui = createUi({
   initialOffsetMs: offsetMs,
@@ -29,17 +39,31 @@ const ui = createUi({
     offsetMs = ms;
     saveOffsetMs(ms);
   },
+  settings,
+  urlSpeed,
+  onSettingsChange: (s) => {
+    settings = s;
+    saveSettings(s);
+  },
   onStart: () => void start(),
 });
+chartPromise.then((loaded) => ui.showSongInfo(loaded));
 
 async function start() {
   if (state === 'playing') return;
   // unlock()はクリックハンドラ内で同期的に呼ぶ(autoplay制限)。awaitはその後。
   await audio.unlock();
-  const chart = await chartPromise;
-  game = new Game(buildPlayNotes(chart, LEAD_IN_SEC));
+  const loaded = await chartPromise;
+  // 速さ倍率はBPMに掛ける。URL指定があれば設定より優先
+  const chart = withSpeed(loaded.chart, urlSpeed ?? settings.speed);
+  const grid = gridOf(chart);
+  game = new Game(buildPlayNotes(chart, leadInSec(grid)));
   game.offsetSec = offsetMs / 1000;
+  audio.setClickVolume(settings.beatVolume);
   startTime = audio.now;
+  // 拍音・拍線はノーツと同じ格子・同じ曲時間から作る。オフセットは掛けない
+  metronome = settings.beatOn ? new Metronome(audio, grid, startTime) : null;
+  beatGrid = settings.beatLines ? grid : null;
   state = 'playing';
   ui.hide();
   requestAnimationFrame(frame);
@@ -69,8 +93,9 @@ function frame() {
   if (state !== 'playing' || !game) return;
   // 描画もAudioContext時間基準。rAFの呼び出し間隔(≒16.7ms)には依存しない
   const t = audio.now - startTime;
+  metronome?.tick();
   game.update(t);
-  renderer.draw(game, t);
+  renderer.draw(game, t, beatGrid);
   if (game.isFinished(t)) {
     state = 'result';
     ui.showResult({
@@ -86,5 +111,5 @@ function frame() {
 }
 
 // タイトル背景として空の盤面を描いておく
-renderer.draw(new Game([]), 0);
+renderer.draw(new Game([]), 0, null);
 ui.showTitle();

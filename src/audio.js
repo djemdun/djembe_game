@@ -1,4 +1,4 @@
-import { createSynthVoices } from './voices.js';
+import { createSynthVoices, playClick } from './voices.js';
 
 /** @typedef {import('./types.js').Sound} Sound */
 /** @typedef {import('./voices.js').Voice} Voice */
@@ -9,6 +9,8 @@ export class AudioEngine {
     this.ctx = null;
     /** @type {GainNode | null} */
     this.master = null;
+    /** 拍音専用のバス。ジャンベの音量(master)とは独立 @type {GainNode | null} */
+    this.clickBus = null;
     /** @type {Record<Sound, Voice> | null} */
     this.voices = null;
   }
@@ -26,6 +28,8 @@ export class AudioEngine {
       this.master = this.ctx.createGain();
       this.master.gain.value = 0.8;
       this.master.connect(this.ctx.destination);
+      this.clickBus = this.ctx.createGain();
+      this.clickBus.connect(this.ctx.destination);
       this.voices = createSynthVoices(this.ctx);
     }
     const resumed = this.ctx.resume();
@@ -40,6 +44,21 @@ export class AudioEngine {
   /** 録音音源などへの差し替え口 @param {Record<Sound, Voice>} voices */
   setVoices(voices) {
     this.voices = voices;
+  }
+
+  /** @param {number} volume 0..1(知覚に合わせ2乗カーブ) */
+  setClickVolume(volume) {
+    if (this.clickBus) this.clickBus.gain.value = volume * volume;
+  }
+
+  /**
+   * 拍音を `when`(AudioContext時間)に予約する
+   * @param {boolean} accent 小節頭
+   * @param {number} when
+   */
+  playClick(accent, when) {
+    if (!this.ctx || !this.clickBus) return;
+    playClick(this.ctx, Math.max(when, this.ctx.currentTime), this.clickBus, accent);
   }
 
   /** 現在のAudioContext時間(秒)。全ゲーム時刻の基準 */

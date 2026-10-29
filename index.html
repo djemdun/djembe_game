@@ -10,8 +10,11 @@
   <canvas id="game"></canvas>
 
   <div id="overlay">
+   <div id="overlay-inner">
     <section id="screen-title">
       <h1>ジャンベ音ゲー</h1>
+      <p id="song-title" class="hint"></p>
+      <ul id="warnings" hidden></ul>
       <button id="start-btn" class="primary" type="button">タップして開始</button>
       <p class="hint">キー: A S D | J K L ／ 画面タップ(マルチタッチ可)</p>
     </section>
@@ -30,7 +33,18 @@
       <button id="retry-btn" class="primary" type="button">もう一度</button>
     </section>
 
-    <div id="offset-panel">
+    <div id="settings-panel" class="panel">
+      <label class="check"><input id="set-beat-on" type="checkbox"> 拍音</label>
+      <label class="slider">音量 <input id="set-beat-vol" type="range" min="0" max="100" step="5"></label>
+      <label class="check"><input id="set-beat-lines" type="checkbox"> 拍線</label>
+      <div class="speed">
+        <span>速さ</span>
+        <span id="speed-options"></span>
+      </div>
+      <p id="speed-note" class="hint" hidden></p>
+    </div>
+
+    <div id="offset-panel" class="panel">
       <div>判定オフセット</div>
       <div class="row">
         <button id="offset-minus" type="button">−5</button>
@@ -40,6 +54,7 @@
       <output id="offset-output"></output>
       <p class="hint">遅れて叩いている/音が遅れて聞こえるなら＋、早いなら−。プレイ中の「+23ms」表示が目安(平均が0に近づくよう調整)</p>
     </div>
+   </div>
   </div>
 
   <script type="module" src="src/main.js"></script>

@@ -7,7 +7,10 @@
  * @typedef {{ beat: number, sound: Sound, hand: Hand, flam: boolean }} ChartNote
  */
 
-/** @typedef {{ bpm: number, notes: ChartNote[] }} Chart */
+/**
+ * bpm は速さ倍率適用後の値になり得る。beatsPerBar/totalBeats は拍音・拍線の格子用(譜面の拍で数える)。
+ * @typedef {{ bpm: number, beatsPerBar: number, totalBeats: number, notes: ChartNote[] }} Chart
+ */
 
 /** @typedef {'PERFECT' | 'GOOD' | 'MISSED'} NoteResult */
 

@@ -137,7 +137,7 @@ export function parseNotation(text) {
     bpm: header.bpm,
     beatsPerBar,
     totalBeats: cursorBeat,
-    chart: { bpm: header.bpm, notes },
+    chart: { bpm: header.bpm, beatsPerBar, totalBeats: cursorBeat, notes },
     warnings,
   };
 }

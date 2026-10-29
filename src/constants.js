@@ -32,8 +32,13 @@ export const SONG_RANK_FALLBACK = 'TRY AGAIN';
 // --- タイミング ---
 /** ノーツが画面上端から判定ラインに届くまでの秒数(小さいほど速い) */
 export const FALL_SEC = 1.6;
-/** 開始ボタンから最初のノーツまでの余白 */
-export const LEAD_IN_SEC = 2;
+/**
+ * 開始ボタンから譜面の拍0までのリードイン(小節数)。秒ではなく拍で持つことで、
+ * BPM・速さ倍率が変わっても常に小節頭から数え始められる(カウントイン兼用)
+ */
+export const LEAD_IN_BARS = 1;
+/** メトロノームの先読み幅(秒)。フレームが多少詰まっても次の拍を取りこぼさない長さ */
+export const METRONOME_LOOKAHEAD_SEC = 0.25;
 /** 最後のノーツ後、リザルトへ移るまでの余韻 */
 export const END_PAD_SEC = 1;
 /** フラムの前打音を着地音の何拍前に置くか */
@@ -43,3 +48,4 @@ export const FLAM_GAP_BEATS = 0.125;
 export const OFFSET_MIN_MS = -300;
 export const OFFSET_MAX_MS = 300;
 export const OFFSET_STORAGE_KEY = 'djembe.offsetMs';
+export const SETTINGS_STORAGE_KEY = 'djembe.settings';
