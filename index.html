@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>ジャンベ音ゲー</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="overlay">
+    <section id="screen-title">
+      <h1>ジャンベ音ゲー</h1>
+      <button id="start-btn" class="primary" type="button">タップして開始</button>
+      <p class="hint">キー: A S D | J K L ／ 画面タップ(マルチタッチ可)</p>
+    </section>
+
+    <section id="screen-result" hidden>
+      <h2>RESULT</h2>
+      <div id="rank"><span id="result-rank"></span></div>
+      <div id="result-accuracy"></div>
+      <table>
+        <tr><th>PERFECT</th><td id="count-perfect"></td></tr>
+        <tr><th>GOOD</th><td id="count-good"></td></tr>
+        <tr><th>MISSED</th><td id="count-missed"></td></tr>
+        <tr><th>SCORE</th><td id="result-score"></td></tr>
+        <tr><th>MAX COMBO</th><td id="result-combo"></td></tr>
+      </table>
+      <button id="retry-btn" class="primary" type="button">もう一度</button>
+    </section>
+
+    <div id="offset-panel">
+      <div>判定オフセット</div>
+      <div class="row">
+        <button id="offset-minus" type="button">−5</button>
+        <input id="offset-slider" type="range" step="1" value="0">
+        <button id="offset-plus" type="button">+5</button>
+      </div>
+      <output id="offset-output"></output>
+      <p class="hint">遅れて叩いている/音が遅れて聞こえるなら＋、早いなら−。プレイ中の「+23ms」表示が目安(平均が0に近づくよう調整)</p>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

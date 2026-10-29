@@ -1,0 +1,93 @@
+import { LANES, LEAD_IN_SEC } from './constants.js';
+import { AudioEngine } from './audio.js';
+import { buildPlayNotes } from './chart.js';
+import { Game } from './game.js';
+import { accuracy, songRank } from './judge.js';
+import { attachInput } from './input.js';
+import { Renderer } from './renderer.js';
+import { loadOffsetMs, saveOffsetMs } from './storage.js';
+import { createUi } from './ui.js';
+import { CHARTS, DEFAULT_CHART_KEY } from './data/charts.js';
+
+const requestedKey = new URLSearchParams(location.search).get('chart') ?? DEFAULT_CHART_KEY;
+if (!(requestedKey in CHARTS)) {
+  console.warn(`unknown chart "${requestedKey}" (available: ${Object.keys(CHARTS).join(', ')}); using ${DEFAULT_CHART_KEY}`);
+}
+const chart = CHARTS[requestedKey] ?? CHARTS[DEFAULT_CHART_KEY];
+
+const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('game'));
+const audio = new AudioEngine();
+const renderer = new Renderer(canvas);
+
+let offsetMs = loadOffsetMs();
+/** @type {'title' | 'playing' | 'result'} */
+let state = 'title';
+/** @type {Game | null} */
+let game = null;
+/** 曲時間0のAudioContext時間。songTime = audio.now - startTime */
+let startTime = 0;
+
+const ui = createUi({
+  initialOffsetMs: offsetMs,
+  onOffsetChange: (ms) => {
+    offsetMs = ms;
+    saveOffsetMs(ms);
+  },
+  onStart: () => void start(),
+});
+
+async function start() {
+  if (state === 'playing') return;
+  // unlock()はクリックハンドラ内で同期的に呼ぶ(autoplay制限)。awaitはその後。
+  await audio.unlock();
+  game = new Game(buildPlayNotes(chart, LEAD_IN_SEC));
+  game.offsetSec = offsetMs / 1000;
+  startTime = audio.now;
+  state = 'playing';
+  ui.hide();
+  requestAnimationFrame(frame);
+}
+
+/** @param {number} eventTimeStamp */
+function songTimeOfEvent(eventTimeStamp) {
+  // 入力イベントの発生時刻と、ハンドラが走った時刻のずれ(メインスレッドの詰まり等)を引いて、
+  // 「実際に叩かれた瞬間」のAudioContext時間に直す。異常値は無視して現在時刻を使う。
+  const lagSec = (performance.now() - eventTimeStamp) / 1000;
+  const safeLag = lagSec >= 0 && lagSec < 0.1 ? lagSec : 0;
+  return audio.now - safeLag - startTime;
+}
+
+attachInput({
+  target: canvas,
+  laneAt: (x) => renderer.laneAt(x),
+  onHit: (lane, ts) => {
+    if (state !== 'playing' || !game) return;
+    game.hit(lane, songTimeOfEvent(ts));
+    // 判定の成否に関わらず、叩いたレーンの音は鳴らす(空打ちも楽器として鳴る)
+    audio.play(LANES[lane].sound);
+  },
+});
+
+function frame() {
+  if (state !== 'playing' || !game) return;
+  // 描画もAudioContext時間基準。rAFの呼び出し間隔(≒16.7ms)には依存しない
+  const t = audio.now - startTime;
+  game.update(t);
+  renderer.draw(game, t);
+  if (game.isFinished(t)) {
+    state = 'result';
+    ui.showResult({
+      rank: songRank(game.counts),
+      accuracy: accuracy(game.counts),
+      counts: game.counts,
+      score: game.score,
+      maxCombo: game.maxCombo,
+    });
+    return;
+  }
+  requestAnimationFrame(frame);
+}
+
+// タイトル背景として空の盤面を描いておく
+renderer.draw(new Game([]), 0);
+ui.showTitle();
