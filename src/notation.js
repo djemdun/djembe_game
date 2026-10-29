@@ -32,8 +32,29 @@ const BEATS_PER_CHAR = 0.5;
 /** 1行 = 2小節 */
 const BARS_PER_LINE = 2;
 
-const PART_HEADER = /^\[(.+?)\]\s*(?:[xX×]\s*(\d+))?\s*$/;
+const PART_HEADER = /^\[(.+?)\]\s*(.*)$/;
+export const AUTO_PLAY_KEYWORD = '自動音';
 const HEADER_LINE = /^(タイトル|BPM|拍子)\s*[:：]\s*(.*)$/i;
+
+/**
+ * パート名の後ろの指定(例: "x8" / "自動音" / "自動音 x2" / "x2 自動音")を読む。順不同。
+ * @param {string} rest `[名前]` より後ろの文字列
+ * @returns {{ repeat: number, autoPlay: boolean, unknown: string[] }}
+ */
+export function parsePartOptions(rest) {
+  let repeat = 1;
+  let autoPlay = false;
+  /** @type {string[]} */
+  const unknown = [];
+  // "x 8" のような空白入りも "x8" として扱う
+  for (const tok of rest.replace(/([xX×])\s+(\d)/g, '$1$2').split(/\s+/).filter(Boolean)) {
+    const m = /^[xX×](\d+)$/.exec(tok);
+    if (m) repeat = Number(m[1]);
+    else if (tok === AUTO_PLAY_KEYWORD) autoPlay = true;
+    else unknown.push(tok);
+  }
+  return { repeat, autoPlay, unknown };
+}
 
 /**
  * 手の割り当て。pos はパート内の1始まりの文字位置(休符も数える)。
@@ -69,7 +90,7 @@ export function parseNotation(text) {
   const warnings = [];
   /** @type {{ title?: string, bpm?: number, beatsPerBar?: number }} */
   const header = {};
-  /** @type {{ name: string, repeat: number, chars: { ch: string, line: number }[], line: number }[]} */
+  /** @type {{ name: string, repeat: number, autoPlay: boolean, chars: { ch: string, line: number }[], line: number }[]} */
   const parts = [];
   let current = null;
 
@@ -80,12 +101,16 @@ export function parseNotation(text) {
 
     const partMatch = PART_HEADER.exec(line);
     if (partMatch) {
-      let repeat = partMatch[2] ? Number(partMatch[2]) : 1;
+      const opts = parsePartOptions(partMatch[2]);
+      for (const tok of opts.unknown) {
+        warnings.push({ line: lineNo, message: `パート指定「${tok}」は未対応です(無視します): ${line}` });
+      }
+      let repeat = opts.repeat;
       if (repeat < 1) {
         warnings.push({ line: lineNo, message: `繰り返し回数が0です。1回として扱います: ${line}` });
         repeat = 1;
       }
-      current = { name: partMatch[1], repeat, chars: [], line: lineNo };
+      current = { name: partMatch[1], repeat, autoPlay: opts.autoPlay, chars: [], line: lineNo };
       parts.push(current);
       return;
     }
@@ -124,7 +149,7 @@ export function parseNotation(text) {
     if (part.chars.length === 0) {
       warnings.push({ line: part.line, message: `パート[${part.name}]に譜面がありません` });
     }
-    const partNotes = buildPartNotes(part.chars, warnings);
+    const partNotes = buildPartNotes(part.chars, warnings, part.autoPlay);
     const partBeats = part.chars.length * BEATS_PER_CHAR;
     for (let r = 0; r < part.repeat; r++) {
       for (const n of partNotes) notes.push({ ...n, beat: cursorBeat + n.beat });
@@ -147,9 +172,10 @@ export function parseNotation(text) {
  * 食い(前の小節にはみ出す音)も特別扱いせず、書かれた位置の奇偶で手が決まる。
  * @param {{ ch: string, line: number }[]} chars
  * @param {NotationWarning[]} warnings
+ * @param {boolean} autoPlay
  * @returns {ChartNote[]}
  */
-function buildPartNotes(chars, warnings) {
+function buildPartNotes(chars, warnings, autoPlay) {
   /** @type {ChartNote[]} */
   const out = [];
   chars.forEach(({ ch, line }, i) => {
@@ -160,7 +186,10 @@ function buildPartNotes(chars, warnings) {
       return;
     }
     const pos = i + 1;
-    out.push({ beat: i * BEATS_PER_CHAR, sound: def.sound, hand: assignHand(pos, def.flam), flam: def.flam });
+    /** @type {ChartNote} */
+    const note = { beat: i * BEATS_PER_CHAR, sound: def.sound, hand: assignHand(pos, def.flam), flam: def.flam };
+    if (autoPlay) note.autoPlay = true; // falseのときはキーを付けない(省略 = false)
+    out.push(note);
   });
   return out;
 }

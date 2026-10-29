@@ -143,18 +143,57 @@ test('速さ倍率: beatは変えず bpm だけ倍率をかける', () => {
   assert.throws(() => withSpeed(chart, 0), /speed/);
 });
 
-test('songs/djole.txt: 30小節・警告なし・構成どおり', () => {
+test('パート指定: 自動音 / x指定 / 併用(順不同)', () => {
+  const body = 'ッッッッッッッタッッッッッッッ'.padEnd(16, 'ッ'); // 位置8にタ
+  const notes = (head) => parseBody(`${head}\n${body}`).chart.notes;
+  assert.equal(notes('[A]').length, 1);
+  assert.equal(notes('[A]')[0].autoPlay, undefined); // 省略 = false(キー自体を付けない)
+  assert.equal(notes('[A] 自動音')[0].autoPlay, true);
+  const both = notes('[A] 自動音 x3');
+  assert.equal(both.length, 3);
+  assert.ok(both.every((n) => n.autoPlay === true));
+  assert.deepEqual(notes('[A] x3 自動音'), both);
+  assert.deepEqual(notes('[A] x 3 自動音'), both); // "x 3" の空白も許す
+});
+
+test('自動音はそのパートだけ。同名の別パートには付かない', () => {
+  const r = parseBody('[合図] 自動音\nタッッッッッッッッッッッッッッッ\n\n[合図]\nタッッッッッッッッッッッッッッッ');
+  assert.deepEqual(r.chart.notes.map((n) => [n.beat, n.autoPlay === true]), [[0, true], [8, false]]);
+});
+
+test('未対応のパート指定は警告して無視', () => {
+  const r = parseBody('[A] 自動 x2\nタッッッッッッッッッッッッッッッ');
+  assert.equal(r.warnings.length, 1);
+  assert.match(r.warnings[0].message, /自動/);
+  assert.equal(r.totalBeats, 16); // x2 は有効
+  assert.equal(r.chart.notes[0].autoPlay, undefined);
+});
+
+test('フラムの自動音: 前打音と本音の両方が autoPlay になる', () => {
+  const r = parseBody('[A] 自動音\nロッッッッッッッッッッッッッッ');
+  assert.equal(r.chart.notes[0].autoPlay, true);
+  const play = buildPlayNotes(r.chart, 0);
+  assert.equal(play.length, 2);
+  assert.ok(play.every((n) => n.autoPlay));
+  assert.ok(buildPlayNotes(parseBody('[A]\nロッッッッッッッッッッッッッッ').chart, 0).every((n) => !n.autoPlay));
+});
+
+test('songs/djole.txt: 22小節・警告なし・構成どおり(合図→伴奏x4→合図→ショフ→合図)', () => {
   const r = parseNotation(readFileSync(new URL('../songs/djole.txt', import.meta.url), 'utf8'));
   assert.equal(r.title, 'Djole');
   assert.equal(r.bpm, 130);
   assert.equal(r.beatsPerBar, 4);
   assert.deepEqual(r.warnings, []);
-  assert.equal(r.totalBeats / r.beatsPerBar, 30);
-  // 合図9 + 伴奏12×8 + ショフ(13×3... 下の内訳) + 合図9
-  assert.equal(r.chart.notes.length, 9 + 96 + 61 + 9 + 9);
+  assert.equal(r.totalBeats / r.beatsPerBar, 22);
+  // 合図9×3 + 伴奏12×4 + ショフ61(13+16+16+16... 4行で61)
+  assert.equal(r.chart.notes.length, 9 * 3 + 12 * 4 + 61);
   // 冒頭の「ロ」= 位置1 の中音フラム → 本音は左
-  assert.deepEqual(r.chart.notes[0], { beat: 0, sound: 'mid', hand: 'L', flam: true });
+  assert.deepEqual(r.chart.notes[0], { beat: 0, sound: 'mid', hand: 'L', flam: true, autoPlay: true });
   // 伴奏の頭は 合図(4拍×2小節=8拍)の直後
   const firstAcc = r.chart.notes.find((n) => n.beat >= 8);
   assert.deepEqual(firstAcc, { beat: 8, sound: 'low', hand: 'R', flam: false });
+  // 自動音は最初の合図(9ノーツ)だけ
+  const auto = r.chart.notes.filter((n) => n.autoPlay);
+  assert.equal(auto.length, 9);
+  assert.ok(auto.every((n) => n.beat < 8));
 });

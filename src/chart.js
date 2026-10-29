@@ -52,6 +52,7 @@ export function expandFlams(notes) {
         sound: n.sound,
         hand: n.hand === 'L' ? 'R' : 'L',
         flam: false,
+        ...(n.autoPlay ? { autoPlay: true } : {}),
       });
     }
     out.push({ ...n, flam: false });
@@ -71,6 +72,7 @@ export function buildPlayNotes(chart, leadInSec) {
       time: leadInSec + beatToSec(n.beat, chart.bpm),
       lane: laneOf(n.hand, n.sound),
       sound: n.sound,
+      autoPlay: n.autoPlay === true,
       result: /** @type {null} */ (null),
     }))
     .sort((a, b) => a.time - b.time);

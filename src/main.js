@@ -1,8 +1,9 @@
 import { LANES } from './constants.js';
 import { AudioEngine } from './audio.js';
 import { buildPlayNotes, withSpeed } from './chart.js';
-import { gridOf, leadInSec } from './beats.js';
-import { Metronome } from './metronome.js';
+import { gridOf, leadInSec, beatsInWindow } from './beats.js';
+import { LookaheadScheduler } from './scheduler.js';
+import { selectAutoNotes, autoNotesInWindow } from './autoplay.js';
 import { parseSpeedParam } from './settings.js';
 import { Game } from './game.js';
 import { accuracy, songRank } from './judge.js';
@@ -28,8 +29,8 @@ let state = 'title';
 let game = null;
 /** 曲時間0のAudioContext時間。songTime = audio.now - startTime */
 let startTime = 0;
-/** @type {Metronome | null} */
-let metronome = null;
+/** 先読みスケジューラ(拍音・自動音)。毎フレーム tick する @type {LookaheadScheduler<any>[]} */
+let schedulers = [];
 /** @type {import('./beats.js').BeatGrid | null} */
 let beatGrid = null;
 
@@ -61,8 +62,20 @@ async function start() {
   game.offsetSec = offsetMs / 1000;
   audio.setClickVolume(settings.beatVolume);
   startTime = audio.now;
-  // 拍音・拍線はノーツと同じ格子・同じ曲時間から作る。オフセットは掛けない
-  metronome = settings.beatOn ? new Metronome(audio, grid, startTime) : null;
+  // 拍音・自動音・拍線は、ノーツと同じ格子・同じ曲時間から作る。判定オフセットは掛けない
+  schedulers = [];
+  if (settings.beatOn) {
+    schedulers.push(
+      new LookaheadScheduler(audio, startTime, (a, b) => beatsInWindow(grid, a, b), (e, when) => audio.playClick(e.accent, when)),
+    );
+  }
+  const autoNotes = selectAutoNotes(game.notes);
+  if (autoNotes.length > 0) {
+    // 自動音: 判定の結果(MISSED等)を待たず、ノーツの時刻ちょうどに予約して鳴らす
+    schedulers.push(
+      new LookaheadScheduler(audio, startTime, (a, b) => autoNotesInWindow(autoNotes, a, b), (n, when) => audio.play(n.sound, when)),
+    );
+  }
   beatGrid = settings.beatLines ? grid : null;
   state = 'playing';
   ui.hide();
@@ -93,7 +106,7 @@ function frame() {
   if (state !== 'playing' || !game) return;
   // 描画もAudioContext時間基準。rAFの呼び出し間隔(≒16.7ms)には依存しない
   const t = audio.now - startTime;
-  metronome?.tick();
+  for (const s of schedulers) s.tick();
   game.update(t);
   renderer.draw(game, t, beatGrid);
   if (game.isFinished(t)) {
