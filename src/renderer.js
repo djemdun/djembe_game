@@ -1,8 +1,10 @@
 import { LANES, LANE_COUNT, FALL_SEC } from './constants.js';
 import { beatsInWindow } from './beats.js';
+import { activeLabel } from './sections.js';
 
 /** @typedef {import('./game.js').Game} Game */
 /** @typedef {import('./beats.js').BeatGrid} BeatGrid */
+/** @typedef {import('./sections.js').SectionLabel} SectionLabel */
 
 const MAX_LANES_WIDTH = 720;
 const JUDGE_Y_RATIO = 0.8;
@@ -63,8 +65,9 @@ export class Renderer {
    * @param {Game} game
    * @param {number} t 曲時間(秒)。ノーツ位置はオフセット抜きの素の時間で描く
    * @param {BeatGrid | null} grid 拍線の格子。null なら描かない
+   * @param {SectionLabel[]} labels セクション名(開始画面の背景描画などでは空)
    */
-  draw(game, t, grid) {
+  draw(game, t, grid, labels) {
     const g = this.g;
     const { x0, laneW, judgeY, cssW, cssH } = this;
     const areaW = laneW * LANE_COUNT;
@@ -171,6 +174,20 @@ export class Renderer {
       g.font = `14px ${FONT}`;
       g.fillStyle = '#8a91a1';
       g.fillText('COMBO', x0 + areaW / 2, judgeY * 0.38 + 20);
+    }
+
+    // セクション名: 画面上部。ノーツに重なっても読めるよう縁取りする
+    const label = activeLabel(labels, t);
+    if (label) {
+      g.globalAlpha = label.alpha;
+      g.font = `bold 30px ${FONT}`;
+      g.lineWidth = 5;
+      g.strokeStyle = '#12141a';
+      g.lineJoin = 'round';
+      g.strokeText(label.name, x0 + areaW / 2, judgeY * 0.16);
+      g.fillStyle = '#ffffff';
+      g.fillText(label.name, x0 + areaW / 2, judgeY * 0.16);
+      g.globalAlpha = 1;
     }
 
     const j = game.lastJudgement;

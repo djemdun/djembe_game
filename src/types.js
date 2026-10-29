@@ -10,7 +10,8 @@
 
 /**
  * bpm は速さ倍率適用後の値になり得る。beatsPerBar/totalBeats は拍音・拍線の格子用(譜面の拍で数える)。
- * @typedef {{ bpm: number, beatsPerBar: number, totalBeats: number, notes: ChartNote[] }} Chart
+ * sections はパートの開始位置(拍)と名前。セクション名の表示用で、判定には使わない。
+ * @typedef {{ bpm: number, beatsPerBar: number, totalBeats: number, notes: ChartNote[], sections?: { beat: number, name: string }[] }} Chart
  */
 
 /** @typedef {'PERFECT' | 'GOOD' | 'MISSED'} NoteResult */

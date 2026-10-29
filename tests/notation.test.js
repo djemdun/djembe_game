@@ -178,6 +178,16 @@ test('フラムの自動音: 前打音と本音の両方が autoPlay になる',
   assert.ok(buildPlayNotes(parseBody('[A]\nロッッッッッッッッッッッッッッ').chart, 0).every((n) => !n.autoPlay));
 });
 
+test('sections: パートの開始位置と名前。x指定の繰り返しは最初の1回だけ、同名パートも各1回', () => {
+  const l = 'ッッッッッッッッッッッッッッッッ';
+  const r = parseBody(`[合図]\n${l}\n\n[伴奏] x3\n${l}\n\n[合図]\n${l}`);
+  assert.deepEqual(r.chart.sections, [
+    { beat: 0, name: '合図' },
+    { beat: 8, name: '伴奏' }, // 8, 16, 24拍の3回分だが1つだけ
+    { beat: 32, name: '合図' },
+  ]);
+});
+
 test('songs/djole.txt: 22小節・警告なし・構成どおり(合図→伴奏x4→合図→ショフ→合図)', () => {
   const r = parseNotation(readFileSync(new URL('../songs/djole.txt', import.meta.url), 'utf8'));
   assert.equal(r.title, 'Djole');
@@ -192,6 +202,14 @@ test('songs/djole.txt: 22小節・警告なし・構成どおり(合図→伴奏
   // 伴奏の頭は 合図(4拍×2小節=8拍)の直後
   const firstAcc = r.chart.notes.find((n) => n.beat >= 8);
   assert.deepEqual(firstAcc, { beat: 8, sound: 'low', hand: 'R', flam: false });
+  // セクション名: 合図→伴奏(x4でも1つ)→合図→ショフ→合図
+  assert.deepEqual(r.chart.sections, [
+    { beat: 0, name: '合図' },
+    { beat: 8, name: '伴奏' },
+    { beat: 40, name: '合図' },
+    { beat: 48, name: 'ショフ' },
+    { beat: 80, name: '合図' },
+  ]);
   // 自動音は最初の合図(9ノーツ)だけ
   const auto = r.chart.notes.filter((n) => n.autoPlay);
   assert.equal(auto.length, 9);

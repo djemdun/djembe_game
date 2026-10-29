@@ -29,13 +29,15 @@
   - 判定オフセットは掛けない(常に譜面の時刻ちょうど)。音量は固定で、ジャンベと同じ経路(別バス・UIなし)
   - 対象は最初の[合図]だけ(`songs/djole.txt` の最初の `[合図] 自動音`)。「採点なし」案は不採用
   - 自動音と叩いた音の二重再生の聞こえ方は、実機で聞いてから対応を判断する(未対応)
+- セクション名表示: 文字譜の `[パート名]` を、そのパートのノーツが上から降り始める頃(開始の `FALL_SEC` 前)に、画面上部へフェードイン→保持→フェードアウトで出す(判定の文字と同じ大きさ)。`x` の繰り返しは最初の1回だけ。全パートを表示。時刻は拍から計算するので速さ倍率に追従
+  - `Chart.sections = [{ beat, name }]`(`parseNotation` が生成。demo/easyは無し)。表示タイミングは `src/sections.js`(純粋)、描画は `renderer.js`
 - 拍線: 小節頭は濃く、他の拍は薄い横線。ノーツと同じ `yOf(time, t)` で位置計算
 - 開始画面の設定(localStorage `djembe.settings`): 拍音ON/OFF・音量、拍線ON/OFF、速さ倍率(スライダー0.5〜1.5・刻み0.05、横に「×0.85 (BPM 110)」表示。保存値は0.5〜1.5にクランプ)。`?speed=`(0.1〜4)指定時はそれが優先(スライダーは無効化し理由を表示)。文字譜の警告も開始画面に表示
 
 ## 譜面の内部形式
 `{ beat, sound, hand, flam, autoPlay? }`
 - sound: `high` / `mid` / `low`、hand: `L` / `R`、flam: boolean、autoPlay: boolean(省略時false。trueのノーツは時刻ちょうどに自動再生)
-- `Chart = { bpm, beatsPerBar, totalBeats, notes: ChartNote[] }`(beatsPerBar/totalBeats は拍音・拍線の格子用。速さ倍率は bpm にだけ掛かる)
+- `Chart = { bpm, beatsPerBar, totalBeats, notes: ChartNote[], sections?: {beat, name}[] }`(beatsPerBar/totalBeats は拍音・拍線の格子用。速さ倍率は bpm にだけ掛かる)
 - ゲーム本体は内部形式だけを読む。文字譜は変換して内部形式にする
 - 判定側(ノーツの時刻・レーン)は文字譜の仕様変更の影響を受けない構造にする
   - `chart.js` の `buildPlayNotes` が内部形式 → `{time, lane, sound, result}` に変換する唯一の場所
@@ -73,6 +75,7 @@ src/
   settings.js   設定の型・既定値・検証、?speed=の解釈(純粋)
   scheduler.js  先読みスケジューラ(拍音・自動音で共用)
   autoplay.js   自動音の選別と時刻窓(純粋)
+  sections.js   セクション名の表示タイミング・不透明度(純粋)
   notation.js   文字譜 → 内部形式 + 警告(純粋)
   songIndex.js  songs/index.json の検証と曲の選択(純粋)
   chartLoader.js ?chart= と index.json から譜面を用意(fetchあり)。失敗時は default → demo + 警告

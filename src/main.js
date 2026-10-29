@@ -4,6 +4,7 @@ import { buildPlayNotes, withSpeed } from './chart.js';
 import { gridOf, leadInSec, beatsInWindow } from './beats.js';
 import { LookaheadScheduler } from './scheduler.js';
 import { selectAutoNotes, autoNotesInWindow } from './autoplay.js';
+import { sectionLabels } from './sections.js';
 import { parseSpeedParam } from './settings.js';
 import { Game } from './game.js';
 import { accuracy, songRank } from './judge.js';
@@ -33,6 +34,8 @@ let startTime = 0;
 let schedulers = [];
 /** @type {import('./beats.js').BeatGrid | null} */
 let beatGrid = null;
+/** @type {import('./sections.js').SectionLabel[]} */
+let labels = [];
 
 const ui = createUi({
   initialOffsetMs: offsetMs,
@@ -77,6 +80,7 @@ async function start() {
     );
   }
   beatGrid = settings.beatLines ? grid : null;
+  labels = sectionLabels(chart, leadInSec(grid));
   state = 'playing';
   ui.hide();
   requestAnimationFrame(frame);
@@ -108,7 +112,7 @@ function frame() {
   const t = audio.now - startTime;
   for (const s of schedulers) s.tick();
   game.update(t);
-  renderer.draw(game, t, beatGrid);
+  renderer.draw(game, t, beatGrid, labels);
   if (game.isFinished(t)) {
     state = 'result';
     ui.showResult({
@@ -124,5 +128,5 @@ function frame() {
 }
 
 // タイトル背景として空の盤面を描いておく
-renderer.draw(new Game([]), 0, null);
+renderer.draw(new Game([]), 0, null, []);
 ui.showTitle();

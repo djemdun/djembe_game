@@ -144,6 +144,8 @@ export function parseNotation(text) {
 
   /** @type {ChartNote[]} */
   const notes = [];
+  /** @type {{ beat: number, name: string }[]} */
+  const sections = [];
   let cursorBeat = 0;
   for (const part of parts) {
     if (part.chars.length === 0) {
@@ -151,6 +153,7 @@ export function parseNotation(text) {
     }
     const partNotes = buildPartNotes(part.chars, warnings, part.autoPlay);
     const partBeats = part.chars.length * BEATS_PER_CHAR;
+    sections.push({ beat: cursorBeat, name: part.name }); // x指定の繰り返しは最初の1回だけ
     for (let r = 0; r < part.repeat; r++) {
       for (const n of partNotes) notes.push({ ...n, beat: cursorBeat + n.beat });
       cursorBeat += partBeats;
@@ -162,7 +165,7 @@ export function parseNotation(text) {
     bpm: header.bpm,
     beatsPerBar,
     totalBeats: cursorBeat,
-    chart: { bpm: header.bpm, beatsPerBar, totalBeats: cursorBeat, notes },
+    chart: { bpm: header.bpm, beatsPerBar, totalBeats: cursorBeat, notes, sections },
     warnings,
   };
 }
