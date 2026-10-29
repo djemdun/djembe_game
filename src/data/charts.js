@@ -3,10 +3,9 @@ import { easyChart } from './easyChart.js';
 
 /** @typedef {import('../types.js').Chart} Chart */
 
-/** コード内蔵の譜面。URLの ?chart=<キー> で選ぶ @type {Record<string, Chart>} */
+/**
+ * コード内蔵の譜面(動作確認用)。URLの ?chart=<キー> で選ぶ。
+ * 文字譜の曲は songs/index.json と songs/<id>.txt で管理する。
+ * @type {Record<string, Chart>}
+ */
 export const CHARTS = { demo: demoChart, easy: easyChart };
-
-/** 文字譜ファイル(fetchして parseNotation で変換)。?chart=<キー> @type {Record<string, string>} */
-export const TEXT_SONGS = { djole: 'songs/djole.txt' };
-
-export const DEFAULT_CHART_KEY = 'djole';

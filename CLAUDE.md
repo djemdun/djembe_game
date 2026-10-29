@@ -67,7 +67,8 @@ src/
   settings.js   設定の型・既定値・検証、?speed=の解釈(純粋)
   metronome.js  拍音の先読みスケジューラ
   notation.js   文字譜 → 内部形式 + 警告(純粋)
-  chartLoader.js ?chart= から譜面を用意(fetchあり)。失敗時はdemo+警告
+  songIndex.js  songs/index.json の検証と曲の選択(純粋)
+  chartLoader.js ?chart= と index.json から譜面を用意(fetchあり)。失敗時は default → demo + 警告
   judge.js      判定窓/曲ランク(純粋)
   game.js       ゲーム状態(スコア/コンボ/判定)。時刻は引数
   voices.js     合成音 Voice と sampleVoice(録音差し替え用)
@@ -79,13 +80,31 @@ src/
   main.js       状態遷移とrAFループ
   data/demoChart.js  仮譜面(約30秒、内部形式)
   data/easyChart.js  判定確認用の易しい譜面(BPM60、20ノーツ)
-  data/charts.js     譜面レジストリ。URL ?chart=djole(既定) / easy / demo、?speed=0.75 で速さ倍率
+  data/charts.js     内蔵譜面(easy / demo)のレジストリ
 tests/*.test.js  node:test(notation / beats / settings)
-songs/djole.txt 文字譜(デフォルトで読み込まれる)
+songs/index.json 曲一覧と既定曲 / songs/<id>.txt 文字譜
 ```
+
+## 曲の管理
+- `songs/index.json` = `{ "default": "<id>", "songs": [{ "id", "title" }] }`。曲の実体は `songs/<id>.txt`
+- **既定曲の変更は index.json の `default` の1行を書き換えるだけ**(コード変更不要)。曲を足すときは `songs` に1行足して `<id>.txt` を置く
+- 読み込み順: `?chart=<id>`(index.jsonの一覧にあるもの。`easy`/`demo` は内蔵譜面)→ 指定なしまたは一覧にない場合は `default`。
+  読み込みに失敗したら default → demo に戻り、理由を開始画面の警告欄に出す。`?speed=0.75` で速さ倍率(0.1〜4)
+- id は英数字・`_`・`-` のみ(ファイル名になるため)
 
 ## 進捗
 - [x] 段階1〜3: 画面、入力と判定、リザルト、オフセットUI(仮譜面)
 - [x] 段階4: 文字譜パーサ(`src/notation.js`) + node:test(`npm test` = `node --test`)
 - [x] 拍音・拍線・開始画面の設定UI・警告表示(拍の計算とsettingsはnode:test済み。音とUIは実機未確認)
 - [ ] 以降: 録音音源への差し替え、手の例外指定、フラム1ノーツ表示、公開
+
+## 将来の候補(未実装。実装前に仕様を相談する)
+- 太鼓モード(タップUI): ジャンベを上から見たSVGの太鼓で、叩く位置でレーンを決める案。縁の中音・高音の分け方は未決定
+- 手の例外指定(文字譜の記法追加。`assignHand` の呼び出し側(`buildPartNotes`)で上書き)
+- 譜面をテキストエリアに貼って即プレイできる画面
+- ソロの一部をループ練習する機能
+- 曲選択画面(`songs/index.json` を利用)
+- スクロール速度(ハイスピード)を速さ倍率と独立に設定(遅い倍率のほうが難しく感じる、という体感がある)
+- ノーツが判定ラインに近づくと見た目が変わる演出
+- 録音音源への差し替え(`Voice` / `sampleVoice` の構造を利用)
+- 16分音符・3連符の記法(ソロを書いて必要になったら)
