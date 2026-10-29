@@ -1,6 +1,7 @@
 {
-  "default": "djole",
+  "default": "dansa",
   "songs": [
-    { "id": "djole", "title": "Djole" }
+    { "id": "djole", "title": "Djole" },
+    { "id": "dansa", "title": "Dansa" }
   ]
 }
