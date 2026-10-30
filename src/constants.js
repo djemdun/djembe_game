@@ -58,10 +58,9 @@ export const HIT_RING_LINE_MAX = 5;
 export const HIT_EFFECT_SEC = 0.3;
 /**
  * 背景のジャンベ(上から見た絵)。ゾーンの半径は仮置きで、ここを変えれば絵と光る範囲が一緒に変わる。
- * 半径は皮(skin)の半径に対する割合。低音=中央、中音=内側リング、高音=外側リング。左手は左半分・右手は右半分
+ * 半径は太鼓(皮)の半径に対する割合。低音=中央、中音=内側リング、高音=外側リング。左手は左半分・右手は右半分
  */
-export const DRUM_SIZE_RATIO = 1; // 縁を含む外径 / 使える領域(幅・判定ラインまでの高さ)の小さい方の半分。1 = 縦画面ではレーン領域の幅いっぱい(高音レーンも太鼓の中に入る)
-export const DRUM_SKIN_RATIO = 0.86; // 皮の半径 / 縁を含む外径
+export const DRUM_SIZE_RATIO = 1; // 皮の半径 / 使える領域(幅・判定ラインまでの高さ)の小さい方の半分。1 = 縦画面ではレーン領域の幅いっぱい(高音レーンも太鼓の中に入る)。縁は描かない
 export const DRUM_ZONES = Object.freeze({
   low: Object.freeze({ rIn: 0, rOut: 0.4 }),
   mid: Object.freeze({ rIn: 0.4, rOut: 0.72 }),

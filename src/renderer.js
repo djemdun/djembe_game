@@ -39,7 +39,7 @@ export class Renderer {
     this.noteR = 0;
     this.labelTop = 0;
     this.labelH = 0;
-    this.drum = { cx: 0, cy: 0, outerR: 0, skinR: 0 };
+    this.drum = { cx: 0, cy: 0, r: 0 };
     this.resize();
     new ResizeObserver(() => this.resize()).observe(canvas);
   }
@@ -90,17 +90,14 @@ export class Renderer {
   #drawDrum(game, t) {
     const g = this.g;
     const d = this.drum;
-    // 縁→皮の順に薄い白を重ねる(皮のほうがわずかに明るい)。ゾーンの境目は細い線
-    g.fillStyle = 'rgba(255, 255, 255, 0.035)';
+    // 皮だけを薄い白で塗る(縁は描かない)。外周とゾーンの境目は細い線
+    g.fillStyle = 'rgba(255, 255, 255, 0.07)';
     g.beginPath();
-    g.arc(d.cx, d.cy, d.outerR, 0, Math.PI * 2);
-    g.fill();
-    g.beginPath();
-    g.arc(d.cx, d.cy, d.skinR, 0, Math.PI * 2);
+    g.arc(d.cx, d.cy, d.r, 0, Math.PI * 2);
     g.fill();
     g.strokeStyle = 'rgba(255, 255, 255, 0.07)';
     g.lineWidth = 1;
-    for (const r of [d.outerR, d.skinR, DRUM_ZONES.mid.rIn * d.skinR, DRUM_ZONES.high.rIn * d.skinR]) {
+    for (const r of [d.r, DRUM_ZONES.mid.rIn * d.r, DRUM_ZONES.high.rIn * d.r]) {
       g.beginPath();
       g.arc(d.cx, d.cy, r, 0, Math.PI * 2);
       g.stroke();
