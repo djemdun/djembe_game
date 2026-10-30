@@ -56,6 +56,19 @@ export const HIT_RING_GROW = 0.9;
 export const HIT_RING_LINE_MAX = 5;
 /** ヒットエフェクト(判定ライン上のリング)の表示時間 */
 export const HIT_EFFECT_SEC = 0.3;
+/**
+ * 背景のジャンベ(上から見た絵)。ゾーンの半径は仮置きで、ここを変えれば絵と光る範囲が一緒に変わる。
+ * 半径は皮(skin)の半径に対する割合。低音=中央、中音=内側リング、高音=外側リング。左手は左半分・右手は右半分
+ */
+export const DRUM_SIZE_RATIO = 0.92; // 縁を含む外径 / 使える領域(幅・判定ラインまでの高さ)の小さい方の半分
+export const DRUM_SKIN_RATIO = 0.86; // 皮の半径 / 縁を含む外径
+export const DRUM_ZONES = Object.freeze({
+  low: Object.freeze({ rIn: 0, rOut: 0.4 }),
+  mid: Object.freeze({ rIn: 0.4, rOut: 0.72 }),
+  high: Object.freeze({ rIn: 0.72, rOut: 1 }),
+});
+/** 叩いた位置が光る強さ(最大不透明度)。色と長さ(HIT_EFFECT_SEC)はヒットエフェクトと同じ */
+export const DRUM_GLOW_ALPHA = 0.5;
 /** 最後のノーツ後、リザルトへ移るまでの余韻 */
 export const END_PAD_SEC = 1;
 /** フラムの前打音を着地音の何拍前に置くか */

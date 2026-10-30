@@ -1,5 +1,6 @@
-import { LANES, LANE_COUNT, FALL_SEC, HIT_EFFECT_SEC, HIT_RING_START, HIT_RING_GROW, HIT_RING_LINE_MAX } from './constants.js';
+import { LANES, LANE_COUNT, FALL_SEC, HIT_EFFECT_SEC, HIT_RING_START, HIT_RING_GROW, HIT_RING_LINE_MAX, DRUM_ZONES, DRUM_GLOW_ALPHA } from './constants.js';
 import { computeLayout } from './layout.js';
+import { drumLayout, drumZoneArc, activeGlows } from './drum.js';
 import { windowBands, zoneOfNote } from './judge.js';
 import { beatsInWindow } from './beats.js';
 import { activeLabel } from './sections.js';
@@ -37,6 +38,7 @@ export class Renderer {
     this.noteR = 0;
     this.labelTop = 0;
     this.labelH = 0;
+    this.drum = { cx: 0, cy: 0, outerR: 0, skinR: 0 };
     this.resize();
     new ResizeObserver(() => this.resize()).observe(canvas);
   }
@@ -56,6 +58,7 @@ export class Renderer {
     this.labelTop = l.labelTop;
     this.labelH = l.labelH;
     this.noteR = l.noteR;
+    this.drum = drumLayout(l.x0, l.areaW, l.judgeY);
   }
 
   /**
@@ -75,6 +78,44 @@ export class Renderer {
    */
   yOf(time, t) {
     return this.judgeY - ((time - t) / FALL_SEC) * this.judgeY;
+  }
+
+  /**
+   * レーンの背後に、ジャンベを上から見た絵を薄く描く。ノーツ・帯・拍線より先に描くので上に重なる。
+   * 叩いた位置の光は game.laneEffects(ヒットエフェクトと同じ情報)から出すため、色・長さ・条件が揃う。
+   * @param {Game} game
+   * @param {number} t
+   */
+  #drawDrum(game, t) {
+    const g = this.g;
+    const d = this.drum;
+    // 縁→皮の順に薄い白を重ねる(皮のほうがわずかに明るい)。ゾーンの境目は細い線
+    g.fillStyle = 'rgba(255, 255, 255, 0.035)';
+    g.beginPath();
+    g.arc(d.cx, d.cy, d.outerR, 0, Math.PI * 2);
+    g.fill();
+    g.beginPath();
+    g.arc(d.cx, d.cy, d.skinR, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+    g.lineWidth = 1;
+    for (const r of [d.outerR, d.skinR, DRUM_ZONES.mid.rIn * d.skinR, DRUM_ZONES.high.rIn * d.skinR]) {
+      g.beginPath();
+      g.arc(d.cx, d.cy, r, 0, Math.PI * 2);
+      g.stroke();
+    }
+
+    for (const glow of activeGlows(game.laneEffects, t)) {
+      const a = drumZoneArc(d, glow.sound, glow.hand);
+      g.globalAlpha = glow.fade * DRUM_GLOW_ALPHA;
+      g.fillStyle = RESULT_COLOR[glow.result];
+      g.beginPath();
+      g.arc(a.cx, a.cy, a.rOut, a.a0, a.a1, false);
+      g.arc(a.cx, a.cy, a.rIn, a.a1, a.a0, true);
+      g.closePath();
+      g.fill();
+      g.globalAlpha = 1;
+    }
   }
 
   /**
@@ -120,6 +161,8 @@ export class Renderer {
     g.moveTo(x0 + areaW / 2, 0);
     g.lineTo(x0 + areaW / 2, cssH);
     g.stroke();
+
+    this.#drawDrum(game, t);
 
     // 判定窓の帯(GOOD は薄く、内側の PERFECT は濃く)。位置は拍線・ノーツと同じ yOf。
     // オフセット分だけ中心がずれる(判定が実際に通る範囲を正直に示すため)
