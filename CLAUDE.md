@@ -31,6 +31,10 @@
   - 自動音と叩いた音の二重再生の聞こえ方は、実機で聞いてから対応を判断する(未対応)
 - セクション名表示: 文字譜の `[パート名]` を、そのパートのノーツが上から降り始める頃(開始の `FALL_SEC` 前)に、画面上部へフェードイン(0.3秒)→保持→フェードアウト(0.5秒)で出す(判定の文字と同じ大きさ)。表示の長さは文字譜1行分(2小節 = `SECTION_LABEL_BARS`)の演奏時間で、BPM・倍率に追従(130BPMで約3.7秒)。`x` の繰り返しは最初の1回だけ。全パートを表示。時刻は拍から計算するので速さ倍率に追従
   - `Chart.sections = [{ beat, name }]`(`parseNotation` が生成。demo/easyは無し)。表示タイミングは `src/sections.js`(純粋)、描画は `renderer.js`
+- 判定位置の可視化: 判定ライン周辺に判定窓(`PERFECT_WINDOW_MS` / `GOOD_WINDOW_MS`)を落下距離に換算した帯を描く(GOOD は薄く、内側の PERFECT は濃く)。位置は拍線・ノーツと同じ `yOf(time, t)`
+  - 帯の中心は判定オフセット分ずれる(`windowBands(offsetSec)`)。判定が実際に通る範囲を示すため。白い判定ライン自体は動かない
+  - 未判定ノーツは、GOOD帯に入ると明るい色、PERFECT帯に入ると更に明るく+光る(`zoneOfNote`。判定と同じ `judgeDelta` を使う)
+  - 叩いたレーンの判定ライン上にヒットエフェクト(リング、0.3秒)。PERFECT/GOOD のみで、MISSED と空打ちは出さない(`Game.laneEffects`)
 - 拍線: 小節頭は濃く、他の拍は薄い横線。ノーツと同じ `yOf(time, t)` で位置計算
 - 開始画面の設定(localStorage `djembe.settings`): 拍音ON/OFF・音量、拍線ON/OFF、速さ倍率(スライダー0.5〜1.5・刻み0.05、横に「×0.85 (BPM 110)」表示。保存値は0.5〜1.5にクランプ)。`?speed=`(0.1〜4)指定時はそれが優先(スライダーは無効化し理由を表示)。文字譜の警告も開始画面に表示
 
@@ -79,7 +83,7 @@ src/
   notation.js   文字譜 → 内部形式 + 警告(純粋)
   songIndex.js  songs/index.json の検証と曲の選択(純粋)
   chartLoader.js ?chart= と index.json から譜面を用意(fetchあり)。失敗時は default → demo + 警告
-  judge.js      判定窓/曲ランク(純粋)
+  judge.js      判定窓/曲ランク/判定帯の位置(純粋)
   game.js       ゲーム状態(スコア/コンボ/判定)。時刻は引数
   voices.js     合成音 Voice と sampleVoice(録音差し替え用)
   audio.js      AudioEngine(unlock / 再生)
@@ -115,6 +119,5 @@ songs/index.json 曲一覧と既定曲 / songs/<id>.txt 文字譜
 - ソロの一部をループ練習する機能
 - 曲選択画面(`songs/index.json` を利用)
 - スクロール速度(ハイスピード)を速さ倍率と独立に設定(遅い倍率のほうが難しく感じる、という体感がある)
-- ノーツが判定ラインに近づくと見た目が変わる演出
 - 録音音源への差し替え(`Voice` / `sampleVoice` の構造を利用)
 - 16分音符・3連符の記法(ソロを書いて必要になったら)

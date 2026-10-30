@@ -1,4 +1,5 @@
-import { LANES, LANE_COUNT, FALL_SEC } from './constants.js';
+import { LANES, LANE_COUNT, FALL_SEC, HIT_EFFECT_SEC } from './constants.js';
+import { windowBands, zoneOfNote } from './judge.js';
 import { beatsInWindow } from './beats.js';
 import { activeLabel } from './sections.js';
 
@@ -10,6 +11,16 @@ const MAX_LANES_WIDTH = 720;
 const JUDGE_Y_RATIO = 0.8;
 const SOUND_COLOR = { high: '#ffd24a', mid: '#4ac3ff', low: '#ff6f6f' };
 const RESULT_COLOR = { PERFECT: '#ffd24a', GOOD: '#4ac3ff', MISSED: '#9aa0aa' };
+
+/** @param {string} hex #rrggbb @param {number} amount 0..1 白への混ぜ具合 */
+function lighten(hex, amount) {
+  const n = parseInt(hex.slice(1), 16);
+  const mix = (/** @type {number} */ c) => Math.round(c + (255 - c) * amount);
+  return `rgb(${mix((n >> 16) & 255)}, ${mix((n >> 8) & 255)}, ${mix(n & 255)})`;
+}
+// ノーツが判定帯に入ったときの色(音の色相は保ったまま白に寄せる。GOOD < PERFECT)
+const GOOD_ZONE_COLOR = { high: lighten(SOUND_COLOR.high, 0.4), mid: lighten(SOUND_COLOR.mid, 0.4), low: lighten(SOUND_COLOR.low, 0.4) };
+const PERFECT_ZONE_COLOR = { high: lighten(SOUND_COLOR.high, 0.75), mid: lighten(SOUND_COLOR.mid, 0.75), low: lighten(SOUND_COLOR.low, 0.75) };
 const FONT = '"Hiragino Sans", "Noto Sans JP", system-ui, sans-serif';
 
 export class Renderer {
@@ -105,6 +116,20 @@ export class Renderer {
     g.lineTo(x0 + areaW / 2, cssH);
     g.stroke();
 
+    // 判定窓の帯(GOOD は薄く、内側の PERFECT は濃く)。位置は拍線・ノーツと同じ yOf。
+    // オフセット分だけ中心がずれる(判定が実際に通る範囲を正直に示すため)
+    if (game.notes.length > 0) {
+      const bands = windowBands(game.offsetSec);
+      /** @param {[number, number]} range */
+      const bandY = (range) => [this.yOf(t + range[1], t), this.yOf(t + range[0], t)];
+      const [gTop, gBottom] = bandY(bands.good);
+      const [pTop, pBottom] = bandY(bands.perfect);
+      g.fillStyle = 'rgba(255, 255, 255, 0.06)';
+      g.fillRect(x0, gTop, areaW, gBottom - gTop);
+      g.fillStyle = 'rgba(255, 255, 255, 0.12)';
+      g.fillRect(x0, pTop, areaW, pBottom - pTop);
+    }
+
     // 拍線(ノーツより下に描く。小節頭は濃く、他の拍は薄く)
     if (grid) {
       for (const b of beatsInWindow(grid, t - 0.4, t + FALL_SEC + 0.1)) {
@@ -128,10 +153,48 @@ export class Renderer {
       const y = this.yOf(n.time, t);
       const cx = x0 + (n.lane + 0.5) * laneW;
       g.globalAlpha = n.result === 'MISSED' ? 0.3 : 1;
-      g.fillStyle = n.result === 'MISSED' ? '#777' : SOUND_COLOR[n.sound];
+      // 未判定のノーツだけ、今叩いたらどの判定になるかで色を変える(GOOD帯: 明るく / PERFECT帯: さらに明るく+光る)
+      const zone = n.result === null ? zoneOfNote(dt, game.offsetSec) : null;
+      g.fillStyle = n.result === 'MISSED' ? '#777'
+        : zone === 'PERFECT' ? PERFECT_ZONE_COLOR[n.sound]
+        : zone === 'GOOD' ? GOOD_ZONE_COLOR[n.sound]
+        : SOUND_COLOR[n.sound];
+      if (zone === 'PERFECT') {
+        g.shadowColor = SOUND_COLOR[n.sound];
+        g.shadowBlur = 18;
+      }
       g.beginPath();
       g.arc(cx, y, r, 0, Math.PI * 2);
       g.fill();
+      g.shadowBlur = 0;
+      if (zone === 'PERFECT') {
+        g.strokeStyle = '#ffffff';
+        g.lineWidth = 3;
+        g.stroke();
+      }
+      g.globalAlpha = 1;
+    }
+
+    // ヒットエフェクト: 叩いたレーンの判定ライン上にリングを広げて消す。MISSEDと空打ちは出さない
+    for (let i = 0; i < LANE_COUNT; i++) {
+      const fx = game.laneEffects[i];
+      if (!fx) continue;
+      const age = t - fx.at;
+      if (age < 0 || age >= HIT_EFFECT_SEC) continue;
+      const p = age / HIT_EFFECT_SEC;
+      const cx = x0 + (i + 0.5) * laneW;
+      g.globalAlpha = (1 - p) * 0.85;
+      g.fillStyle = RESULT_COLOR[fx.result];
+      g.beginPath();
+      g.arc(cx, judgeY, r * (0.9 + 0.6 * p), 0, Math.PI * 2);
+      g.globalAlpha = (1 - p) * 0.3;
+      g.fill();
+      g.globalAlpha = (1 - p) * 0.85;
+      g.strokeStyle = RESULT_COLOR[fx.result];
+      g.lineWidth = 4 * (1 - p) + 1;
+      g.beginPath();
+      g.arc(cx, judgeY, r * (1 + 0.9 * p), 0, Math.PI * 2);
+      g.stroke();
       g.globalAlpha = 1;
     }
 

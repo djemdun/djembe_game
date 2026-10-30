@@ -5,3 +5,5 @@ node_modules/
 .idea/
 # 試聴ページなどの開発用ツール(公開しない)
 dev/
+# Claude Code のローカル設定(個人の許可設定。公開しない)
+.claude/settings.local.json

@@ -46,6 +46,8 @@ export const METRONOME_LOOKAHEAD_SEC = 0.25;
 export const SECTION_LABEL_BARS = 2;
 export const SECTION_FADE_IN_SEC = 0.3;
 export const SECTION_FADE_OUT_SEC = 0.5;
+/** ヒットエフェクト(判定ライン上のリング)の表示時間 */
+export const HIT_EFFECT_SEC = 0.3;
 /** 最後のノーツ後、リザルトへ移るまでの余韻 */
 export const END_PAD_SEC = 1;
 /** フラムの前打音を着地音の何拍前に置くか */

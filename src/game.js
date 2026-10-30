@@ -31,6 +31,8 @@ export class Game {
     this.lastJudgement = null;
     /** レーンごとの最終入力時刻(曲時間)。ヒット演出用 */
     this.laneHitAt = new Array(LANE_COUNT).fill(-Infinity);
+    /** レーンごとの最後のヒット(PERFECT/GOOD)。判定ライン上のエフェクト用。MISSEDと空打ちは入らない @type {({ result: 'PERFECT' | 'GOOD', at: number } | null)[]} */
+    this.laneEffects = new Array(LANE_COUNT).fill(null);
     this.judgedCount = 0;
     this.lastNoteTime = notes.length ? notes[notes.length - 1].time : 0;
   }
@@ -49,6 +51,7 @@ export class Game {
     if (!result) return null;
     this.heads[lane]++;
     this.#settle(note, result, deltaSec, songTime);
+    this.laneEffects[lane] = { result, at: songTime };
     return result;
   }
 
