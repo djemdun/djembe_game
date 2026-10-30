@@ -10,7 +10,8 @@ import { activeLabel } from './sections.js';
 /** @typedef {import('./sections.js').SectionLabel} SectionLabel */
 
 const SOUND_COLOR = { high: '#ffd24a', mid: '#4ac3ff', low: '#ff6f6f' };
-const RESULT_COLOR = { PERFECT: '#ffd24a', GOOD: '#4ac3ff', MISSED: '#9aa0aa' };
+// 判定の色。ノーツの音の色(高=黄・中=青・低=赤)と被らないようにする(被ると叩いた音の色と取り違える)
+const RESULT_COLOR = { PERFECT: '#ffffff', GOOD: '#6ee7a0', MISSED: '#9aa0aa' };
 
 /** @param {string} hex #rrggbb @param {number} amount 0..1 白への混ぜ具合 */
 function lighten(hex, amount) {
@@ -82,7 +83,7 @@ export class Renderer {
 
   /**
    * レーンの背後に、ジャンベを上から見た絵を薄く描く。ノーツ・帯・拍線より先に描くので上に重なる。
-   * 叩いた位置の光は game.laneEffects(ヒットエフェクトと同じ情報)から出すため、長さ・条件が揃う。色は音の色。
+   * 叩いた位置の光は game.laneEffects(ヒットエフェクトと同じ情報)から出すため、色・長さ・条件が揃う。
    * @param {Game} game
    * @param {number} t
    */
@@ -108,9 +109,7 @@ export class Renderer {
     for (const glow of activeGlows(game.laneEffects, t)) {
       const a = drumZoneArc(d, glow.sound, glow.hand);
       g.globalAlpha = glow.fade * DRUM_GLOW_ALPHA;
-      // 色相は音の色(ノーツ・レーンと同じ)。判定は明るさで示す(ノーツが帯に入ったときと同じ GOOD < PERFECT)。
-      // 判定の色(PERFECT=黄・GOOD=青)をそのまま使うと、音の色(高=黄・中=青)と区別がつかなくなるため
-      g.fillStyle = glow.result === 'PERFECT' ? PERFECT_ZONE_COLOR[glow.sound] : GOOD_ZONE_COLOR[glow.sound];
+      g.fillStyle = RESULT_COLOR[glow.result];
       g.beginPath();
       g.arc(a.cx, a.cy, a.rOut, a.a0, a.a1, false);
       g.arc(a.cx, a.cy, a.rIn, a.a1, a.a0, true);
