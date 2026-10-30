@@ -52,6 +52,7 @@ export function createUi({ initialOffsetMs, onOffsetChange, settings, urlSpeed, 
   el('start-btn').addEventListener('click', () => onStart(false));
   el('auto-btn').addEventListener('click', () => onStart(true));
   el('retry-btn').addEventListener('click', () => onStart(false));
+  el('retry-auto-btn').addEventListener('click', () => onStart(true));
 
   // --- 曲の選択(songs/index.json の songs) ---
   const songPicker = el('song-picker');
@@ -168,8 +169,8 @@ export function createUi({ initialOffsetMs, onOffsetChange, settings, urlSpeed, 
       el('count-missed').textContent = String(s.counts.MISSED);
       el('result-score').textContent = String(s.score);
       el('result-combo').textContent = String(s.maxCombo);
-      // 結果画面でも曲を選び直せるよう、選択欄を「もう一度」の上へ移す。選んだ曲は「もう一度」で遊べる
-      result.insertBefore(songPicker, el('retry-btn'));
+      // 結果画面でも曲を選び直せるよう、選択欄をボタンの行の上へ移す。選んだ曲は「もう一度」「自動演奏」で遊べる
+      result.insertBefore(songPicker, el('result-actions'));
       title.hidden = true;
       result.hidden = false;
       overlay.hidden = false;
