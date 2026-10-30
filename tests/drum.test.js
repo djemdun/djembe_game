@@ -1,59 +1,60 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { drumLayout, drumLaneColumn, activeGlows } from '../src/drum.js';
+import { drumLayout, drumZoneArc, activeGlows } from '../src/drum.js';
 import { computeLayout } from '../src/layout.js';
-import { LANES, LANE_COUNT, HIT_EFFECT_SEC } from '../src/constants.js';
+import { LANES, HIT_EFFECT_SEC, DRUM_ZONES } from '../src/constants.js';
 
+const laneOf = (hand, sound) => LANES.findIndex((l) => l.hand === hand && l.sound === sound);
 const effects = (/** @type {Record<number, object>} */ m) => LANES.map((_, i) => m[i] ?? null);
-const SIZES = [[390, 800], [360, 640], [667, 375], [1280, 720], [320, 480], [820, 1180]];
-const layoutOf = (w, h) => { const l = computeLayout(w, h); return { l, d: drumLayout(l.x0, l.areaW, l.judgeY) }; };
 
-test('drumLayout: 幅はレーン領域いっぱい、下端は判定ライン、中心線(上辺)より上は無い', () => {
-  for (const [w, h] of SIZES) {
-    const { l, d } = layoutOf(w, h);
-    assert.equal(d.cx - d.rx, l.x0, `${w}x${h} 左端`);
-    assert.ok(Math.abs(d.cx + d.rx - (l.x0 + l.areaW)) < 1e-9, `${w}x${h} 右端`);
-    assert.ok(Math.abs(d.cy + d.ry - l.judgeY) < 1e-9, `${w}x${h} 下端 = 判定ライン`);
-    assert.ok(d.cy >= 0, `${w}x${h} 上辺が画面内`);
+test('drumLayout: レーン領域の中央・判定ラインより上に収まる', () => {
+  const d = drumLayout(100, 400, 600);
+  assert.equal(d.cx, 300);
+  assert.equal(d.cy, 300);
+  assert.ok(d.outerR <= 200 && d.outerR <= 300);
+  assert.ok(d.skinR < d.outerR);
+});
+
+test('drumLayout: 縦画面(390x800)・横画面(667x375)・最大幅でも領域からはみ出さない', () => {
+  for (const [w, h] of [[390, 800], [360, 640], [667, 375], [1280, 720], [320, 480]]) {
+    const l = computeLayout(w, h);
+    const d = drumLayout(l.x0, l.areaW, l.judgeY);
+    assert.ok(d.cx - d.outerR >= l.x0 - 1e-9, `${w}x${h} 左`);
+    assert.ok(d.cx + d.outerR <= l.x0 + l.areaW + 1e-9, `${w}x${h} 右`);
+    assert.ok(d.cy - d.outerR >= 0, `${w}x${h} 上`);
+    assert.ok(d.cy + d.outerR <= l.judgeY + 1e-9, `${w}x${h} 判定ライン`);
   }
 });
 
-test('drumLayout: 縦画面では半円(奥行き = 半幅)、横長で高さが足りなければ奥行きだけ縮む', () => {
-  const p = layoutOf(390, 800).d;
-  assert.equal(p.ry, p.rx);
-  const ls = layoutOf(667, 375).d;
-  assert.ok(ls.ry < ls.rx);
-  assert.equal(ls.rx, computeLayout(667, 375).areaW / 2); // 幅は縮めない(光る位置をレーンに合わせるため)
+test('drumZoneArc: 低=中央の半円 / 中=内側リング / 高=外側リング(半径は定数どおり)', () => {
+  const d = { cx: 0, cy: 0, skinR: 100 };
+  const low = drumZoneArc(d, 'low', 'L');
+  const mid = drumZoneArc(d, 'mid', 'L');
+  const high = drumZoneArc(d, 'high', 'L');
+  assert.equal(low.rIn, 0);
+  assert.equal(low.rOut, DRUM_ZONES.low.rOut * 100);
+  assert.equal(mid.rIn, low.rOut); // 隙間も重なりもなく内側から順に並ぶ
+  assert.equal(high.rIn, mid.rOut);
+  assert.equal(high.rOut, 100); // 外側リングは皮の縁まで
 });
 
-test('drumLaneColumn: 光る帯はノーツのレーンと同じ x 範囲で、隙間なく並ぶ', () => {
-  for (const [w, h] of SIZES) {
-    const { l, d } = layoutOf(w, h);
-    for (let i = 0; i < LANE_COUNT; i++) {
-      const c = drumLaneColumn(d, i);
-      assert.ok(Math.abs(c.x - (l.x0 + i * l.laneW)) < 1e-9, `${w}x${h} lane${i} x`);
-      assert.ok(Math.abs(c.w - l.laneW) < 1e-9, `${w}x${h} lane${i} w`);
-    }
-  }
-});
-
-test('光る位置の並び: 中央が低音、その外側が中音、左右の端が高音。左手=左半分、右手=右半分', () => {
-  const { d } = layoutOf(390, 800);
-  const dist = (/** @type {number} */ lane) => { const c = drumLaneColumn(d, lane); return Math.abs(c.x + c.w / 2 - d.cx); };
-  for (const hand of ['L', 'R']) {
-    const [high, mid, low] = ['high', 'mid', 'low'].map((s) => LANES.findIndex((x) => x.hand === hand && x.sound === s));
-    assert.ok(dist(low) < dist(mid) && dist(mid) < dist(high), `${hand} 中央ほど低音`);
-    for (const lane of [high, mid, low]) {
-      const c = drumLaneColumn(d, lane);
-      const center = c.x + c.w / 2;
-      assert.ok(hand === 'L' ? center < d.cx : center > d.cx, `${hand} の半分`);
-    }
-  }
+test('drumZoneArc: 左手は左半分、右手は右半分(canvasは0=右・時計回り)', () => {
+  const d = { cx: 0, cy: 0, skinR: 100 };
+  const l = drumZoneArc(d, 'mid', 'L');
+  const r = drumZoneArc(d, 'mid', 'R');
+  assert.deepEqual([l.a0, l.a1], [Math.PI / 2, (Math.PI * 3) / 2]);
+  assert.deepEqual([r.a0, r.a1], [-Math.PI / 2, Math.PI / 2]);
+  // 弧の中点: 左は真左(π)、右は真右(0)
+  assert.ok(Math.abs(Math.cos((l.a0 + l.a1) / 2) + 1) < 1e-9);
+  assert.ok(Math.abs(Math.cos((r.a0 + r.a1) / 2) - 1) < 1e-9);
 });
 
 test('activeGlows: ヒットのあったレーンだけ、レーン定義どおりの音と手で返る', () => {
-  const g = activeGlows(effects({ 0: { result: 'PERFECT', at: 1 }, 3: { result: 'GOOD', at: 1 } }), 1.1);
-  assert.deepEqual(g.map((x) => [x.lane, x.sound, x.hand, x.result]), [[0, 'high', 'L', 'PERFECT'], [3, 'low', 'R', 'GOOD']]);
+  const g = activeGlows(effects({
+    [laneOf('L', 'high')]: { result: 'PERFECT', at: 1 },
+    [laneOf('R', 'low')]: { result: 'GOOD', at: 1 },
+  }), 1.1);
+  assert.deepEqual(g.map((x) => [x.sound, x.hand, x.result]), [['high', 'L', 'PERFECT'], ['low', 'R', 'GOOD']]);
 });
 
 test('activeGlows: ヒットエフェクトと同じ長さで消える(叩いた瞬間 fade=1、HIT_EFFECT_SEC で消灯)', () => {

@@ -1,38 +1,36 @@
-// 背景のジャンベ(上から見た絵の下半分)の位置計算。DOM に依存しない純粋関数(テスト可能)。
+// 背景のジャンベ(上から見た絵)の位置計算。DOM に依存しない純粋関数(テスト可能)。
 
-import { LANES, LANE_COUNT, HIT_EFFECT_SEC, DRUM_MAX_DEPTH_RATIO } from './constants.js';
+import { LANES, HIT_EFFECT_SEC, DRUM_SIZE_RATIO, DRUM_SKIN_RATIO, DRUM_ZONES } from './constants.js';
 
 /** @typedef {import('./types.js').Sound} Sound */
 /** @typedef {import('./types.js').Hand} Hand */
 /** @typedef {{ result: 'PERFECT' | 'GOOD', at: number } | null} LaneEffect */
-/** @typedef {{ cx: number, cy: number, rx: number, ry: number, x0: number, laneW: number }} DrumLayout */
 
 /**
- * 太鼓(半楕円)の配置。横はレーン領域いっぱい、下端は判定ライン。平らな側(上辺)が太鼓の中心線で、
- * その上は描かない(普段叩くのは中心から下側だけ)。奥行き ry は幅の半分(= 半円)を上限に、
- * 判定ラインまでの高さに収まるよう縮める(横長の画面では半楕円になる)。
- * 光る位置は x 方向がレーンの帯と一致する必要があるので、幅は縮めず奥行きだけ縮める。
+ * 太鼓の中心と半径。横はレーン領域の中央、縦は画面上端〜判定ラインの中央に置く。
+ * 判定ラインより下(余白・キー表示)には出さないので、layout.js の余白計算には影響しない。
  * @param {number} x0 レーン領域の左端
  * @param {number} areaW レーン領域の幅
  * @param {number} judgeY 判定ラインのy
- * @returns {DrumLayout}
+ * @returns {{ cx: number, cy: number, outerR: number, skinR: number }}
  */
 export function drumLayout(x0, areaW, judgeY) {
-  const rx = areaW / 2;
-  const ry = Math.min(rx, judgeY * DRUM_MAX_DEPTH_RATIO);
-  return { cx: x0 + rx, cy: judgeY - ry, rx, ry, x0, laneW: areaW / LANE_COUNT };
+  const outerR = Math.min(areaW / 2, judgeY / 2) * DRUM_SIZE_RATIO;
+  return { cx: x0 + areaW / 2, cy: judgeY / 2, outerR, skinR: outerR * DRUM_SKIN_RATIO };
 }
 
 /**
- * レーンに対応する光る領域の横範囲。ノーツが落ちるレーンの帯そのもの。
- * 左から 高・中・低 | 低・中・高 なので、中央が低音、外側が高音、左手が左半分・右手が右半分になる。
- * 実際に光るのは、この帯と太鼓(半楕円)の重なり部分。
- * @param {DrumLayout} drum
- * @param {number} lane
- * @returns {{ x: number, w: number }}
+ * 音と手に対応する光る領域(半円環)。角度は canvas の arc 用(0 = 右、時計回り)。
+ * 左手 = 左半分(下→左→上)、右手 = 右半分(上→右→下)。低音は rIn = 0 の半円。
+ * @param {{ cx: number, cy: number, skinR: number }} drum
+ * @param {Sound} sound
+ * @param {Hand} hand
+ * @returns {{ cx: number, cy: number, rIn: number, rOut: number, a0: number, a1: number }}
  */
-export function drumLaneColumn(drum, lane) {
-  return { x: drum.x0 + lane * drum.laneW, w: drum.laneW };
+export function drumZoneArc(drum, sound, hand) {
+  const z = DRUM_ZONES[sound];
+  const [a0, a1] = hand === 'L' ? [Math.PI / 2, (Math.PI * 3) / 2] : [-Math.PI / 2, Math.PI / 2];
+  return { cx: drum.cx, cy: drum.cy, rIn: z.rIn * drum.skinR, rOut: z.rOut * drum.skinR, a0, a1 };
 }
 
 /**
