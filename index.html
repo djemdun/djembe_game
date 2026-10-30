@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <title>ジャンベ音ゲー</title>
+  <title>DJEMBE GAME</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -12,8 +12,13 @@
   <div id="overlay">
    <div id="overlay-inner">
     <section id="screen-title">
-      <h1>ジャンベ音ゲー</h1>
-      <p id="song-title" class="hint"></p>
+      <h1>DJEMBE GAME</h1>
+      <div class="title-rule" aria-hidden="true"></div>
+      <p id="song-title" class="song-title"></p>
+      <div id="song-picker" class="song-picker" hidden>
+        <label for="song-select">曲を選ぶ</label>
+        <select id="song-select"></select>
+      </div>
       <ul id="warnings" hidden></ul>
       <div class="start-row">
         <button id="start-btn" class="primary" type="button">タップして開始</button>

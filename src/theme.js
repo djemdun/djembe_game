@@ -13,9 +13,9 @@ export const THEME = {
   // 音ごとのノーツの基本色。ノーツ本体に加えて、叩いたレーンの光・下部のキー表示・PERFECT帯での発光にも使う。
   // 判定の色(judgement)と被ると叩いた音の色と取り違えるので、judgement とは別の色相にする
   sound: {
-    high: '#ff9a3c', // 高音のノーツ
-    mid: '#6ee7a0', // 中音のノーツ
-    low: '#ff6f6f', // 低音のノーツ
+    high: '#ffff40', // 高音のノーツ
+    mid: '#40ff40'  , // 中音のノーツ
+    low: '#ff4040', // 低音のノーツ
   },
 
   // ノーツの状態ごとの変化
@@ -29,10 +29,10 @@ export const THEME = {
 
   // 判定の色。判定の文字・ずれ(ms)の表示・ヒットリング・太鼓の光で共通
   judgement: {
-    PERFECT: '#ffd24a', // PERFECT
-    GOOD: '#4ac3ff', // GOOD
-    MISSED: '#9aa0aa', // MISSED
-  },
+    PERFECT: '#fcd66f', // PERFECT
+    GOOD: '#ffffff', // GOOD  
+    MISSED: '#888888', // MISSED
+  },  
 
   // 判定帯(判定ライン周辺の、判定が通る範囲を示す帯)。白の透明度で重ねる
   band: {

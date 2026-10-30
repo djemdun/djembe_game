@@ -4,6 +4,9 @@
   --text: #f2f4f8;
   --muted: #8a91a1;
   --accent: #ffd24a;
+  /* 金 → 琥珀。タイトルと開始ボタンのグラデーションの下側 */
+  --accent-deep: #e8993a;
+  --line: rgba(255, 255, 255, 0.1);
 }
 
 * { box-sizing: border-box; }
@@ -36,7 +39,12 @@ html, body {
   inset: 0;
   display: flex;
   padding: 16px;
-  background: rgba(10, 12, 16, 0.82);
+  /* 上の方にごく薄い金の光を置き、後ろのゲーム画面はぼかして透かす */
+  background:
+    radial-gradient(ellipse 90% 55% at 50% 18%, rgba(255, 210, 74, 0.12), transparent 70%),
+    rgba(10, 12, 16, 0.86);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   /* 設定が増えて小さい画面で収まらないため、オーバーレイ自身をスクロール可能に。
      bodyはtouch-action:noneなので、ここだけ縦パンを許可する */
   overflow-y: auto;
@@ -67,7 +75,87 @@ button {
   border-radius: 10px;
   padding: 10px 18px;
   touch-action: manipulation;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
+button:active { transform: translateY(1px) scale(0.98); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* スライダーとチェックボックスをアクセント色に */
+input[type="range"], input[type="checkbox"] { accent-color: var(--accent); }
+
+/* --- TOPページ --- */
+#screen-title h1 {
+  margin: 0;
+  font-size: clamp(30px, 9.5vw, 64px);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  /* 金のグラデーションを文字の形に切り抜く(-webkit- は古い Safari 用) */
+  background: linear-gradient(180deg, #fff6d0 0%, var(--accent) 55%, var(--accent-deep) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  filter: drop-shadow(0 4px 24px rgba(255, 210, 74, 0.28));
+}
+.title-rule {
+  width: 72px;
+  height: 3px;
+  margin: 16px auto 0;
+  border-radius: 3px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+}
+/* 曲名: タイトルに次ぐ大きさで、白く太く。♪ はアクセント色の飾り */
+.song-title {
+  margin: 20px auto 0;
+  max-width: 100%;
+  font-size: clamp(22px, 6.4vw, 40px);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+}
+.song-title::before { content: "♪"; margin-right: 0.4em; color: var(--accent); }
+.song-title:empty { display: none; }
+/* 曲の選択: 曲名の下に小さく置く。ネイティブの <select> なのでスマホでも標準のピッカーが開く */
+.song-picker { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 14px auto 0; }
+.song-picker[hidden] { display: none; }
+.song-picker label { color: var(--muted); font-size: 12px; letter-spacing: 0.18em; }
+.song-picker select {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: min(260px, 100%);
+  padding: 11px 40px 11px 20px;
+  font: inherit;
+  font-size: 16px;
+  color: var(--text);
+  text-align: center;
+  background-color: rgba(255, 255, 255, 0.06);
+  /* ▾ を SVG で描く(appearance:none で標準の矢印が消えるため) */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23ffd24a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.song-picker select:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* Windows などで開いた一覧の背景が白くならないように */
+.song-picker select option { background: var(--panel); color: var(--text); }
+@media (hover: hover) { .song-picker select:hover { border-color: var(--accent); } }
+#screen-title .start-row { margin-top: 28px; }
+/* 順番にふわっと出す。display を指定しない(section[hidden] を ID 指定が上書きしてしまうため) */
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+#screen-title > * { animation: rise 0.6s ease-out both; }
+#screen-title > :nth-child(2) { animation-delay: 0.05s; }
+#screen-title > :nth-child(3) { animation-delay: 0.1s; }
+#screen-title > :nth-child(4) { animation-delay: 0.15s; }
+#screen-title > :nth-child(5) { animation-delay: 0.2s; }
+#screen-title > :nth-child(6) { animation-delay: 0.25s; }
+#screen-title > :nth-child(7) { animation-delay: 0.3s; }
+@media (prefers-reduced-motion: reduce) { #screen-title > * { animation: none; } }
+
 .start-row { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 /* 画面が広ければ「タップして開始」の右に並べる */
 @media (min-width: 560px) {
@@ -75,18 +163,28 @@ button {
 }
 .secondary {
   font-size: 16px;
-  padding: 12px 22px;
-  background: transparent;
-  border: 1px solid #5a6276;
+  letter-spacing: 0.06em;
+  padding: 13px 26px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
   color: var(--text);
 }
 .primary {
   font-size: 22px;
-  font-weight: bold;
-  color: #12141a;
-  background: var(--accent);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #1a1305;
+  background: linear-gradient(180deg, #ffe38f 0%, var(--accent) 45%, var(--accent-deep) 100%);
   border: none;
-  padding: 16px 36px;
+  border-radius: 999px;
+  padding: 16px 44px;
+  box-shadow: 0 10px 30px rgba(255, 210, 74, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+/* マウスのあるPCだけホバー演出(タッチ端末では押した状態が残るため) */
+@media (hover: hover) {
+  .primary:hover { transform: translateY(-1px); box-shadow: 0 14px 38px rgba(255, 210, 74, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.5); }
+  .secondary:hover { border-color: var(--accent); color: var(--accent); }
 }
 
 #rank { font-size: 44px; font-weight: bold; color: var(--accent); }
@@ -98,8 +196,12 @@ th { text-align: left; font-weight: normal; color: var(--muted); }
 .panel {
   width: min(360px, 100%);
   padding: 12px 16px;
-  background: var(--panel);
-  border-radius: 12px;
+  /* すりガラス風: 半透明にして後ろをぼかし、細い縁で輪郭を出す */
+  background: rgba(28, 32, 41, 0.62);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
   text-align: center;
   flex: none;
 }

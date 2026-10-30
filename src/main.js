@@ -12,13 +12,16 @@ import { attachInput } from './input.js';
 import { Renderer } from './renderer.js';
 import { loadOffsetMs, saveOffsetMs, loadSettings, saveSettings } from './storage.js';
 import { createUi } from './ui.js';
-import { loadChart } from './chartLoader.js';
+import { loadChart, loadSong } from './chartLoader.js';
 
 const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('game'));
 /** 起動時に読み込みを開始。開始ボタンまでに終わっていれば待ち時間なし */
 const params = new URLSearchParams(location.search);
 const urlSpeed = parseSpeedParam(params.get('speed'));
-const chartPromise = loadChart(params);
+/** 選択中の曲。常に解決する(曲の切り替えが失敗しても前の曲に戻るので、開始ボタンは安全に await できる) @type {Promise<import('./chartLoader.js').LoadedChart>} */
+let chartPromise = loadChart(params);
+/** 曲の切り替えの通し番号。古い読み込みの結果で画面を上書きしないため */
+let songSeq = 0;
 const audio = new AudioEngine();
 const renderer = new Renderer(canvas);
 
@@ -50,8 +53,37 @@ const ui = createUi({
     saveSettings(s);
   },
   onStart: (auto) => void start(auto),
+  onSongChange: (id) => void changeSong(id),
 });
-chartPromise.then((loaded) => ui.showSongInfo({ ...loaded, bpm: loaded.chart.bpm }));
+chartPromise.then((loaded) => {
+  const initial = /** @type {import('./chartLoader.js').InitialChart} */ (loaded);
+  ui.setSongs(initial.songs, initial.id);
+  ui.showSongInfo({ ...initial, bpm: initial.chart.bpm });
+});
+
+/**
+ * TOP画面で曲が選ばれたとき。読めなければ前の曲に戻し、理由を警告欄に出す。
+ * @param {string} id
+ */
+async function changeSong(id) {
+  const seq = ++songSeq;
+  const prev = chartPromise;
+  /** @type {unknown} */
+  let failure = null;
+  const next = loadSong(id).catch((e) => {
+    failure = e;
+    return prev;
+  });
+  chartPromise = next;
+  const loaded = await next;
+  if (seq !== songSeq) return; // さらに別の曲が選ばれた。こちらの結果は捨てる
+  const warnings = [...loaded.warnings];
+  if (failure !== null) {
+    ui.setSelectedSong(loaded.id);
+    warnings.push({ line: 0, message: `曲"${id}"を読めません(${failure instanceof Error ? failure.message : String(failure)})。"${loaded.id}"のままです` });
+  }
+  ui.showSongInfo({ ...loaded, warnings, bpm: loaded.chart.bpm });
+}
 
 /** @param {boolean} autoAll 自動演奏(お手本)モードで開始するか。押したボタンで決まり、状態は持たない */
 async function start(autoAll) {

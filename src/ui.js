@@ -23,8 +23,9 @@ function el(id) {
  * @param {number | null} p.urlSpeed URLの ?speed=。指定があれば設定の速さより優先される
  * @param {(s: Settings) => void} p.onSettingsChange
  * @param {(autoAll: boolean) => void} p.onStart 開始。true = 自動演奏(お手本)。押したボタンでモードが決まる
+ * @param {(id: string) => void} p.onSongChange TOP画面で曲が選ばれた(songs/index.json の id)
  */
-export function createUi({ initialOffsetMs, onOffsetChange, settings, urlSpeed, onSettingsChange, onStart }) {
+export function createUi({ initialOffsetMs, onOffsetChange, settings, urlSpeed, onSettingsChange, onStart, onSongChange }) {
   const overlay = el('overlay');
   const title = el('screen-title');
   const result = el('screen-result');
@@ -51,6 +52,11 @@ export function createUi({ initialOffsetMs, onOffsetChange, settings, urlSpeed, 
   el('start-btn').addEventListener('click', () => onStart(false));
   el('auto-btn').addEventListener('click', () => onStart(true));
   el('retry-btn').addEventListener('click', () => onStart(false));
+
+  // --- 曲の選択(songs/index.json の songs) ---
+  const songPicker = el('song-picker');
+  const songSelect = /** @type {HTMLSelectElement} */ (el('song-select'));
+  songSelect.addEventListener('change', () => onSongChange(songSelect.value));
 
   // --- 設定(拍音・拍線・速さ) ---
   let current = { ...settings };
@@ -101,12 +107,34 @@ export function createUi({ initialOffsetMs, onOffsetChange, settings, urlSpeed, 
   }
 
   return {
+    /**
+     * 曲の選択肢を作る。選べる曲が2つ未満なら選択欄ごと隠す。
+     * @param {{ id: string, title: string }[]} songs
+     * @param {string} selectedId 一覧にない(demo など)ときは何も選ばれない状態になる
+     */
+    setSongs(songs, selectedId) {
+      songSelect.replaceChildren(
+        ...songs.map((s) => {
+          const o = document.createElement('option');
+          o.value = s.id;
+          o.textContent = s.title;
+          return o;
+        }),
+      );
+      songSelect.value = selectedId;
+      songPicker.hidden = songs.length < 2;
+    },
+    /** 読み込みに失敗したとき、選択欄を実際に使っている曲へ戻す @param {string} id */
+    setSelectedSong(id) {
+      songSelect.value = id;
+    },
     /** 譜面の読み込み完了後に呼ぶ。警告は画面にも出す(console.warnだけだと気づけない) */
     /** @param {{ title: string, bpm: number, warnings: NotationWarning[] }} info */
     showSongInfo({ title: songTitle, bpm, warnings }) {
       baseBpm = bpm;
       renderSpeed();
-      el('song-title').textContent = songTitle ? `♪ ${songTitle}` : '';
+      // 「♪」は CSS(.song-title::before)で付ける。空のときは :empty で非表示になる
+      el('song-title').textContent = songTitle ?? '';
       const list = el('warnings');
       list.replaceChildren();
       for (const w of warnings.slice(0, MAX_WARNINGS_SHOWN)) {
