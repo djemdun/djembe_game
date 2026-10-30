@@ -9,9 +9,9 @@ import { activeLabel } from './sections.js';
 /** @typedef {import('./beats.js').BeatGrid} BeatGrid */
 /** @typedef {import('./sections.js').SectionLabel} SectionLabel */
 
-const SOUND_COLOR = { high: '#ffd24a', mid: '#4ac3ff', low: '#ff6f6f' };
-// 判定の色。ノーツの音の色(高=黄・中=青・低=赤)と被らないようにする(被ると叩いた音の色と取り違える)
-const RESULT_COLOR = { PERFECT: '#ffffff', GOOD: '#6ee7a0', MISSED: '#9aa0aa' };
+const SOUND_COLOR = { high: '#ffd24a', mid: '#6ee7a0', low: '#ff6f6f' };
+// 判定の色。ノーツの音の色(高=黄・中=緑・低=赤)と被らないようにする(被ると叩いた音の色と取り違える)
+const RESULT_COLOR = { PERFECT: '#ff4fd8', GOOD: '#4ac3ff', MISSED: '#9aa0aa' };
 
 /** @param {string} hex #rrggbb @param {number} amount 0..1 白への混ぜ具合 */
 function lighten(hex, amount) {
