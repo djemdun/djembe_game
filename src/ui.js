@@ -150,6 +150,8 @@ export function createUi({ initialOffsetMs, onOffsetChange, settings, urlSpeed, 
       list.hidden = warnings.length === 0;
     },
     showTitle() {
+      // 曲の選択欄は1つを使い回す(2つ作ると選択状態の同期が要るため)。TOPでは警告欄の上に置く
+      title.insertBefore(songPicker, el('warnings'));
       title.hidden = false;
       result.hidden = true;
       overlay.hidden = false;
@@ -166,6 +168,8 @@ export function createUi({ initialOffsetMs, onOffsetChange, settings, urlSpeed, 
       el('count-missed').textContent = String(s.counts.MISSED);
       el('result-score').textContent = String(s.score);
       el('result-combo').textContent = String(s.maxCombo);
+      // 結果画面でも曲を選び直せるよう、選択欄を「もう一度」の上へ移す。選んだ曲は「もう一度」で遊べる
+      result.insertBefore(songPicker, el('retry-btn'));
       title.hidden = true;
       result.hidden = false;
       overlay.hidden = false;
