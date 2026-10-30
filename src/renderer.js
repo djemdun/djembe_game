@@ -1,6 +1,11 @@
-import { LANES, LANE_COUNT, FALL_SEC, HIT_EFFECT_SEC, HIT_RING_START, HIT_RING_GROW, HIT_RING_LINE_MAX, DRUM_ZONES, DRUM_GLOW_ALPHA } from './constants.js';
+import { LANES, LANE_COUNT, FALL_SEC, HIT_EFFECT_SEC, DRUM_ZONES } from './constants.js';
 import { computeLayout } from './layout.js';
-import { drumLayout, drumZoneArc, activeGlows } from './drum.js';
+import { drumLayout, activeGlows } from './drum.js';
+import { THEME } from './theme.js';
+import {
+  drawBackground, drawLane, drawLaneLines, drawBands, drawBeatLine, drawNote,
+  drawHitEffect, drawDrumBase, drawDrumGlow, drawJudgeLine,
+} from './paint.js';
 import { windowBands, zoneOfNote } from './judge.js';
 import { beatsInWindow } from './beats.js';
 import { activeLabel } from './sections.js';
@@ -9,19 +14,6 @@ import { activeLabel } from './sections.js';
 /** @typedef {import('./beats.js').BeatGrid} BeatGrid */
 /** @typedef {import('./sections.js').SectionLabel} SectionLabel */
 
-const SOUND_COLOR = { high: '#ff9a3c', mid: '#6ee7a0', low: '#ff6f6f' };
-// 判定の色。ノーツの音の色(高=オレンジ・中=緑・低=赤)と被らないようにする(被ると叩いた音の色と取り違える)
-const RESULT_COLOR = { PERFECT: '#ffd24a', GOOD: '#4ac3ff', MISSED: '#9aa0aa' };
-
-/** @param {string} hex #rrggbb @param {number} amount 0..1 白への混ぜ具合 */
-function lighten(hex, amount) {
-  const n = parseInt(hex.slice(1), 16);
-  const mix = (/** @type {number} */ c) => Math.round(c + (255 - c) * amount);
-  return `rgb(${mix((n >> 16) & 255)}, ${mix((n >> 8) & 255)}, ${mix(n & 255)})`;
-}
-// ノーツが判定帯に入ったときの色(音の色相は保ったまま白に寄せる。GOOD < PERFECT)
-const GOOD_ZONE_COLOR = { high: lighten(SOUND_COLOR.high, 0.4), mid: lighten(SOUND_COLOR.mid, 0.4), low: lighten(SOUND_COLOR.low, 0.4) };
-const PERFECT_ZONE_COLOR = { high: lighten(SOUND_COLOR.high, 0.75), mid: lighten(SOUND_COLOR.mid, 0.75), low: lighten(SOUND_COLOR.low, 0.75) };
 const FONT = '"Hiragino Sans", "Noto Sans JP", system-ui, sans-serif';
 
 export class Renderer {
@@ -90,30 +82,9 @@ export class Renderer {
   #drawDrum(game, t) {
     const g = this.g;
     const d = this.drum;
-    // 皮だけを薄い白で塗る(縁は描かない)。外周とゾーンの境目は細い線
-    g.fillStyle = 'rgba(255, 255, 255, 0.07)';
-    g.beginPath();
-    g.arc(d.cx, d.cy, d.r, 0, Math.PI * 2);
-    g.fill();
-    g.strokeStyle = 'rgba(255, 255, 255, 0.07)';
-    g.lineWidth = 1;
-    for (const r of [d.r, DRUM_ZONES.mid.rIn * d.r, DRUM_ZONES.high.rIn * d.r]) {
-      g.beginPath();
-      g.arc(d.cx, d.cy, r, 0, Math.PI * 2);
-      g.stroke();
-    }
-
-    for (const glow of activeGlows(game.laneEffects, t)) {
-      const a = drumZoneArc(d, glow.sound, glow.hand);
-      g.globalAlpha = glow.fade * DRUM_GLOW_ALPHA;
-      g.fillStyle = RESULT_COLOR[glow.result];
-      g.beginPath();
-      g.arc(a.cx, a.cy, a.rOut, a.a0, a.a1, false);
-      g.arc(a.cx, a.cy, a.rIn, a.a1, a.a0, true);
-      g.closePath();
-      g.fill();
-      g.globalAlpha = 1;
-    }
+    // 皮だけを塗る(縁は描かない)。外周とゾーンの境目は細い線
+    drawDrumBase(g, d, [d.r, DRUM_ZONES.mid.rIn * d.r, DRUM_ZONES.high.rIn * d.r]);
+    for (const glow of activeGlows(game.laneEffects, t)) drawDrumGlow(g, d, glow);
   }
 
   /**
@@ -127,38 +98,14 @@ export class Renderer {
     const { x0, laneW, judgeY, cssW, cssH, labelTop, labelH } = this;
     const areaW = laneW * LANE_COUNT;
 
-    g.fillStyle = '#12141a';
-    g.fillRect(0, 0, cssW, cssH);
+    drawBackground(g, cssW, cssH);
 
-    // レーン
+    // レーン(叩いた直後は音の色で光る)
     for (let i = 0; i < LANE_COUNT; i++) {
-      const x = x0 + i * laneW;
-      g.fillStyle = i % 2 ? '#181b23' : '#1c2029';
-      g.fillRect(x, 0, laneW, cssH);
-      const age = t - game.laneHitAt[i];
-      if (age >= 0 && age < 0.18) {
-        g.globalAlpha = (1 - age / 0.18) * 0.35;
-        g.fillStyle = SOUND_COLOR[LANES[i].sound];
-        g.fillRect(x, 0, laneW, cssH);
-        g.globalAlpha = 1;
-      }
+      drawLane(g, { index: i, x: x0 + i * laneW, w: laneW, h: cssH, sound: LANES[i].sound, ageSec: t - game.laneHitAt[i] });
     }
-    g.strokeStyle = '#2c313d';
-    g.lineWidth = 1;
-    for (let i = 0; i <= LANE_COUNT; i++) {
-      const x = Math.round(x0 + i * laneW) + 0.5;
-      g.beginPath();
-      g.moveTo(x, 0);
-      g.lineTo(x, cssH);
-      g.stroke();
-    }
-    // 左手/右手の境目を強調
-    g.strokeStyle = '#4a5163';
-    g.lineWidth = 2;
-    g.beginPath();
-    g.moveTo(x0 + areaW / 2, 0);
-    g.lineTo(x0 + areaW / 2, cssH);
-    g.stroke();
+    // 区切り線と、左手/右手の境目の強調
+    drawLaneLines(g, x0, laneW, LANE_COUNT, cssH);
 
     this.#drawDrum(game, t);
 
@@ -170,22 +117,13 @@ export class Renderer {
       const bandY = (range) => [this.yOf(t + range[1], t), this.yOf(t + range[0], t)];
       const [gTop, gBottom] = bandY(bands.good);
       const [pTop, pBottom] = bandY(bands.perfect);
-      g.fillStyle = 'rgba(255, 255, 255, 0.06)';
-      g.fillRect(x0, gTop, areaW, gBottom - gTop);
-      g.fillStyle = 'rgba(255, 255, 255, 0.12)';
-      g.fillRect(x0, pTop, areaW, pBottom - pTop);
+      drawBands(g, { x: x0, w: areaW, goodTop: gTop, goodBottom: gBottom, perfectTop: pTop, perfectBottom: pBottom });
     }
 
     // 拍線(ノーツより下に描く。小節頭は濃く、他の拍は薄く)
     if (grid) {
       for (const b of beatsInWindow(grid, t - 0.4, t + FALL_SEC + 0.1)) {
-        const y = Math.round(this.yOf(b.time, t)) + 0.5;
-        g.strokeStyle = b.accent ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)';
-        g.lineWidth = b.accent ? 2 : 1;
-        g.beginPath();
-        g.moveTo(x0, y);
-        g.lineTo(x0 + areaW, y);
-        g.stroke();
+        drawBeatLine(g, x0, areaW, Math.round(this.yOf(b.time, t)) + 0.5, b.accent);
       }
     }
 
@@ -196,29 +134,9 @@ export class Renderer {
       if (dt > FALL_SEC + 0.1) break;
       if (dt < -0.4) continue;
       if (n.result && n.result !== 'MISSED') continue;
-      const y = this.yOf(n.time, t);
-      const cx = x0 + (n.lane + 0.5) * laneW;
-      g.globalAlpha = n.result === 'MISSED' ? 0.3 : 1;
       // 未判定のノーツだけ、今叩いたらどの判定になるかで色を変える(GOOD帯: 明るく / PERFECT帯: さらに明るく+光る)
       const zone = n.result === null ? zoneOfNote(dt, game.offsetSec) : null;
-      g.fillStyle = n.result === 'MISSED' ? '#777'
-        : zone === 'PERFECT' ? PERFECT_ZONE_COLOR[n.sound]
-        : zone === 'GOOD' ? GOOD_ZONE_COLOR[n.sound]
-        : SOUND_COLOR[n.sound];
-      if (zone === 'PERFECT') {
-        g.shadowColor = SOUND_COLOR[n.sound];
-        g.shadowBlur = 18;
-      }
-      g.beginPath();
-      g.arc(cx, y, r, 0, Math.PI * 2);
-      g.fill();
-      g.shadowBlur = 0;
-      if (zone === 'PERFECT') {
-        g.strokeStyle = '#ffffff';
-        g.lineWidth = 3;
-        g.stroke();
-      }
-      g.globalAlpha = 1;
+      drawNote(g, { cx: x0 + (n.lane + 0.5) * laneW, y: this.yOf(n.time, t), r, sound: n.sound, result: n.result, zone });
     }
 
     // ヒットエフェクト: 叩いたレーンの判定ライン上にリングを広げて消す。MISSEDと空打ちは出さない
@@ -227,43 +145,24 @@ export class Renderer {
       if (!fx) continue;
       const age = t - fx.at;
       if (age < 0 || age >= HIT_EFFECT_SEC) continue;
-      const p = age / HIT_EFFECT_SEC;
-      const cx = x0 + (i + 0.5) * laneW;
-      g.globalAlpha = (1 - p) * 0.85;
-      g.fillStyle = RESULT_COLOR[fx.result];
-      g.beginPath();
-      g.arc(cx, judgeY, r * (0.9 + 0.6 * p), 0, Math.PI * 2);
-      g.globalAlpha = (1 - p) * 0.3;
-      g.fill();
-      g.globalAlpha = (1 - p) * 0.85;
-      g.strokeStyle = RESULT_COLOR[fx.result];
-      g.lineWidth = (HIT_RING_LINE_MAX - 1) * (1 - p) + 1;
-      g.beginPath();
-      g.arc(cx, judgeY, r * (HIT_RING_START + HIT_RING_GROW * p), 0, Math.PI * 2);
-      g.stroke();
-      g.globalAlpha = 1;
+      drawHitEffect(g, { cx: x0 + (i + 0.5) * laneW, y: judgeY, r, result: fx.result, progress: age / HIT_EFFECT_SEC });
     }
 
     // 判定ライン
-    g.strokeStyle = '#ffffff';
-    g.lineWidth = 3;
-    g.beginPath();
-    g.moveTo(x0, judgeY);
-    g.lineTo(x0 + areaW, judgeY);
-    g.stroke();
+    drawJudgeLine(g, x0, areaW, judgeY);
 
     // 下部ラベル(キー/音/手)
-    g.fillStyle = '#0d0f14';
+    g.fillStyle = THEME.keyStrip.background;
     // 判定ラインの下には ringMargin ぶんの余白(レーンの背景のまま)を空け、リングが切れないようにする
     g.fillRect(x0, labelTop, areaW, labelH);
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     for (let i = 0; i < LANE_COUNT; i++) {
       const cx = x0 + (i + 0.5) * laneW;
-      g.fillStyle = SOUND_COLOR[LANES[i].sound];
+      g.fillStyle = THEME.sound[LANES[i].sound];
       g.font = `bold ${Math.min(laneW * 0.4, 26, labelH * 0.42)}px ${FONT}`;
       g.fillText(LANES[i].keyLabel, cx, labelTop + labelH * 0.38);
-      g.fillStyle = '#8a91a1';
+      g.fillStyle = THEME.keyStrip.text;
       g.font = `${Math.min(laneW * 0.26, 16, labelH * 0.27)}px ${FONT}`;
       g.fillText(`${LANES[i].hand === 'L' ? '左' : '右'}${LANES[i].soundLabel}`, cx, labelTop + labelH * 0.7);
     }
@@ -271,7 +170,7 @@ export class Renderer {
     // HUD
     g.textBaseline = 'alphabetic';
     g.textAlign = 'left';
-    g.fillStyle = '#fff';
+    g.fillStyle = THEME.hud.text;
     g.font = `bold 22px ${FONT}`;
     // 全部自動演奏(お手本)中は採点しないので、スコア・コンボ・判定文字の代わりに表示だけ出す
     g.fillText(game.autoAll ? 'AUTO PLAY' : `SCORE ${game.score}`, x0 + 12, 32);
@@ -279,10 +178,10 @@ export class Renderer {
     g.textAlign = 'center';
     if (!game.autoAll && game.combo >= 2) {
       g.font = `bold 40px ${FONT}`;
-      g.fillStyle = '#fff';
+      g.fillStyle = THEME.hud.text;
       g.fillText(String(game.combo), x0 + areaW / 2, judgeY * 0.38);
       g.font = `14px ${FONT}`;
-      g.fillStyle = '#8a91a1';
+      g.fillStyle = THEME.hud.muted;
       g.fillText('COMBO', x0 + areaW / 2, judgeY * 0.38 + 20);
     }
 
@@ -292,10 +191,10 @@ export class Renderer {
       g.globalAlpha = label.alpha;
       g.font = `bold 30px ${FONT}`;
       g.lineWidth = 5;
-      g.strokeStyle = '#12141a';
+      g.strokeStyle = THEME.hud.sectionOutline;
       g.lineJoin = 'round';
       g.strokeText(label.name, x0 + areaW / 2, judgeY * 0.16);
-      g.fillStyle = '#ffffff';
+      g.fillStyle = THEME.hud.sectionFill;
       g.fillText(label.name, x0 + areaW / 2, judgeY * 0.16);
       g.globalAlpha = 1;
     }
@@ -303,7 +202,7 @@ export class Renderer {
     const j = game.lastJudgement;
     if (!game.autoAll && j && t - j.at < 0.5) {
       g.globalAlpha = 1 - (t - j.at) / 0.5;
-      g.fillStyle = RESULT_COLOR[j.result];
+      g.fillStyle = THEME.judgement[j.result];
       g.font = `bold 30px ${FONT}`;
       g.fillText(j.result, x0 + areaW / 2, judgeY * 0.6);
       if (j.deltaSec !== null) {

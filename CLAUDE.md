@@ -37,8 +37,8 @@
   - 叩いたレーンの判定ライン上にヒットエフェクト(リング、0.3秒)。PERFECT/GOOD のみで、MISSED と空打ちは出さない(`Game.laneEffects`)
   - リングが切れないよう、判定ラインの下に余白を確保する(`layout.js` の `ringMargin` = リング最大半径を切り上げ。`HIT_RING_*` 定数から計算するのでエフェクトのサイズ変更に追従)。判定ライン(canvas高さの0.8)・落下距離・帯の幅は変えず、キー表示の帯がその余白の下に下がる
 - 背景のジャンベ: レーンの後ろに、ジャンベを上から見た円形の皮を薄く描く(画像素材なし、canvas)。縁は描かない(一度は描いたが、皮が小さくなり高音レーンが縁にかかるため廃止)。皮の半径は領域(レーン幅・判定ラインまでの高さ)の小さい方いっぱい(`DRUM_SIZE_RATIO` = 1。縦画面ではレーン領域の幅いっぱいで、左右の端の高音レーンも太鼓の中に入る)に収め、横はレーン領域の中央・縦は上端〜判定ラインの中央。判定ラインより下には出さないので `ringMargin` や落下距離・帯の幅は変わらない
-  - 叩いた位置が光る: 低音=中央、中音=内側リング、高音=外側リング(仮置き)。左手は左半分、右手は右半分。ゾーンの半径は `constants.js` の `DRUM_ZONES`(皮の半径に対する割合)、大きさ・光の強さは `DRUM_SIZE_RATIO` / `DRUM_GLOW_ALPHA`
-  - 判定の色は PERFECT=金(#ffd24a)・GOOD=青(#4ac3ff)・MISSED=灰(`renderer.js` の `RESULT_COLOR`。判定の文字・ずれのms表示・ヒットリング・太鼓の光で共通)。ノーツの音の色(`SOUND_COLOR`: 高=オレンジ #ff9a3c・中=緑 #6ee7a0・低=赤 #ff6f6f)とは被らない色にする。以前は PERFECT=黄・GOOD=青で音の色(高=黄・中=青)と被り、太鼓の光が叩いた音と違う色に見えたため。PERFECT を一番目立つ色(金)にする方針で、高音ノーツを黄からオレンジ寄りにし、中音ノーツの青と GOOD の緑を入れ替えた。ピンクは試して不採用(見た目が合わなかった)
+  - 叩いた位置が光る: 低音=中央、中音=内側リング、高音=外側リング(仮置き)。左手は左半分、右手は右半分。ゾーンの半径は `constants.js` の `DRUM_ZONES`(皮の半径に対する割合)、大きさは `DRUM_SIZE_RATIO`、光の強さは `theme.js` の `drum.glowAlpha`
+  - 判定の色は PERFECT=金(#ffd24a)・GOOD=青(#4ac3ff)・MISSED=灰(`theme.js` の `THEME.judgement`。判定の文字・ずれのms表示・ヒットリング・太鼓の光で共通)。ノーツの音の色(`THEME.sound`: 高=オレンジ #ff9a3c・中=緑 #6ee7a0・低=赤 #ff6f6f)とは被らない色にする。以前は PERFECT=黄・GOOD=青で音の色(高=黄・中=青)と被り、太鼓の光が叩いた音と違う色に見えたため。PERFECT を一番目立つ色(金)にする方針で、高音ノーツを黄からオレンジ寄りにし、中音ノーツの青と GOOD の緑を入れ替えた。ピンクは試して不採用(見た目が合わなかった)
   - 光らせる条件・色・長さはヒットエフェクトと同じ。`Game.laneEffects`(PERFECT/GOOD のみ。MISSED・空打ちは入らない。自動演奏の自動ヒットも入る)から作るので、描画の時計も同じ曲時間。計算は `src/drum.js`(`drumLayout` / `drumZoneArc` / `activeGlows`)
   - 表示のみ。タップ入力は変えていない(太鼓モードは将来の候補)
 - 全部自動演奏(お手本): 開始画面の副ボタン「自動演奏」で開始する(「タップして開始」の下、広い画面では右)。押したボタンでモードが決まり、ON/OFFの状態は持たない。譜面の確認とお手本が目的。どちらのボタンもクリックの中で同期的に `AudioContext` を unlock する
@@ -78,6 +78,13 @@
 - テスト対象: 手の割り当て、フラムの偶奇、繰り返し、行の文字数チェック
 - 純粋ロジック(`chart.js` / `beats.js` / `notation.js` / `settings.js` / `judge.js` / `constants.js`)はDOM・AudioContextに触れない。`game.js` も時刻を引数で受け取り、自前で時計を持たない
 
+## 色の管理
+- ゲーム画面(canvas)の色は `src/theme.js` の `THEME` に集約する。各値に「何を変えるものか」のコメントがある。`renderer.js` / `paint.js` に色を直書きしない(DOM側の色は `style.css`)
+- `THEME` は毎フレーム読み直す(キャッシュしない)ので、実行時に書き換えると次のフレームから反映される。これが色の調整ページの前提
+- 書式の約束: 値は1行に1つ、入れ子は `key: {` ... `},`、色は `#rgb` / `#rrggbb` / `rgba(r, g, b, a)`、割合・不透明度は 0..1(調整ページが theme.js をコメントごと読み書きするため)
+- 不変条件(`tests/theme.test.js`): 音の色(高・中・低)と判定の色(PERFECT・GOOD・MISSED)は6色すべて別(被ると叩いた音と取り違える)。`sound.*` は `#rrggbb`(白への混ぜ計算のため)
+- 色の調整ページ(`dev/color-tuner.html`。`dev/` は .gitignore で公開・コミットされない): `python3 dev/serve.py` → http://localhost:8000/dev/color-tuner.html。本番と同じ `paint.js` / `Renderer` で、ノーツ(音×未判定・GOOD帯・PERFECT帯・MISSED)・ヒットリング・太鼓の光・ゲーム画面全体(中音と高音を交互に叩く再生つき)を見ながら、カラーピッカーとスライダーで調整する。決めた値は theme.js 全文(コメントそのまま、変えた行だけ差し替え)として書き出し、貼り付ける。`dev/` はコミットされないので、別の環境では手元で作り直しが必要
+
 ## ファイル構成
 ```
 index.html / style.css / jsconfig.json
@@ -96,11 +103,13 @@ src/
   judge.js      判定窓/曲ランク/判定帯の位置(純粋)
   layout.js     canvasレイアウト(判定ライン位置・リングの余白)(純粋)
   drum.js       背景ジャンベの配置・光る領域(音と手→半円環)・今光っているレーン(純粋)
+  theme.js      ゲーム画面(canvas)の色の定義。色の調整はここだけ(ノーツ・判定・帯・ヒットリング・太鼓・拍線・レーン・HUD)
+  paint.js      色に関わる描画部品(ノーツ・帯・ヒットリング・太鼓の光など)。theme.js だけを読む。renderer.js と色の調整ページが共用
   game.js       ゲーム状態(スコア/コンボ/判定)。時刻は引数
   voices.js     合成音 Voice と sampleVoice(録音差し替え用)
   audio.js      AudioEngine(unlock / 再生)
   input.js      キーボード + Pointer Events
-  renderer.js   canvas描画、レイアウト、座標→レーン
+  renderer.js   canvas描画(paint.js の部品を並べる)、レイアウト、座標→レーン
   storage.js    オフセット・設定のlocalStorage(try/catch済み)
   ui.js         開始/リザルト/オフセットのDOM
   main.js       状態遷移とrAFループ

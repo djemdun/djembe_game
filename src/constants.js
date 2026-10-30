@@ -66,8 +66,6 @@ export const DRUM_ZONES = Object.freeze({
   mid: Object.freeze({ rIn: 0.4, rOut: 0.72 }),
   high: Object.freeze({ rIn: 0.72, rOut: 1 }),
 });
-/** 叩いた位置が光る強さ(最大不透明度)。色と長さ(HIT_EFFECT_SEC)はヒットエフェクトと同じ */
-export const DRUM_GLOW_ALPHA = 0.5;
 /** 最後のノーツ後、リザルトへ移るまでの余韻 */
 export const END_PAD_SEC = 1;
 /** フラムの前打音を着地音の何拍前に置くか */
