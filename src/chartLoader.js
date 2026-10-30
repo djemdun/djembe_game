@@ -40,7 +40,8 @@ export async function loadSong(id) {
  */
 export async function loadChart(params) {
   const requested = params.get('chart');
-  if (requested !== null && requested in CHARTS) {
+  // in 演算子だと constructor / __proto__ などの継承されたプロパティも真になる。自前のキーだけを見る
+  if (requested !== null && Object.hasOwn(CHARTS, requested)) {
     return { chart: CHARTS[requested], title: requested, warnings: [], id: requested, songs: [] };
   }
 

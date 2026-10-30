@@ -64,3 +64,22 @@ test('loadSong: 選んだ曲を読み、id と曲名を返す。読めなけれ�
   missing.add(`songs/${s.id}.txt`);
   await assert.rejects(() => loadSong(s.id), /404/);
 });
+
+test('loadChart: ?chart= に Object.prototype の名前(constructor / __proto__ など)を指定しても壊れない(内蔵譜面として扱わず、一覧にない曲として default に戻る)', async () => {
+  for (const name of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
+    const r = await loadChart(params(`chart=${name}`));
+    assert.equal(r.id, INDEX.default, name);
+    assert.ok(Array.isArray(r.chart.notes) && r.chart.notes.length > 0, `${name}: 譜面が読める`);
+    assert.equal(typeof r.chart.bpm, 'number', name);
+    assert.match(r.warnings[0].message, new RegExp(`${name}.*一覧にありません`), name);
+  }
+});
+
+test('loadChart: 内蔵譜面の名前(easy / demo)は従来どおり使える', async () => {
+  for (const name of ['easy', 'demo']) {
+    const r = await loadChart(params(`chart=${name}`));
+    assert.equal(r.id, name);
+    assert.deepEqual(r.warnings, []);
+    assert.ok(r.chart.notes.length > 0);
+  }
+});
