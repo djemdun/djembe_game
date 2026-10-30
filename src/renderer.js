@@ -1,4 +1,5 @@
-import { LANES, LANE_COUNT, FALL_SEC, HIT_EFFECT_SEC } from './constants.js';
+import { LANES, LANE_COUNT, FALL_SEC, HIT_EFFECT_SEC, HIT_RING_START, HIT_RING_GROW, HIT_RING_LINE_MAX } from './constants.js';
+import { computeLayout } from './layout.js';
 import { windowBands, zoneOfNote } from './judge.js';
 import { beatsInWindow } from './beats.js';
 import { activeLabel } from './sections.js';
@@ -7,8 +8,6 @@ import { activeLabel } from './sections.js';
 /** @typedef {import('./beats.js').BeatGrid} BeatGrid */
 /** @typedef {import('./sections.js').SectionLabel} SectionLabel */
 
-const MAX_LANES_WIDTH = 720;
-const JUDGE_Y_RATIO = 0.8;
 const SOUND_COLOR = { high: '#ffd24a', mid: '#4ac3ff', low: '#ff6f6f' };
 const RESULT_COLOR = { PERFECT: '#ffd24a', GOOD: '#4ac3ff', MISSED: '#9aa0aa' };
 
@@ -35,6 +34,9 @@ export class Renderer {
     this.x0 = 0;
     this.laneW = 0;
     this.judgeY = 0;
+    this.noteR = 0;
+    this.labelTop = 0;
+    this.labelH = 0;
     this.resize();
     new ResizeObserver(() => this.resize()).observe(canvas);
   }
@@ -47,10 +49,13 @@ export class Renderer {
     this.canvas.width = Math.round(this.cssW * dpr);
     this.canvas.height = Math.round(this.cssH * dpr);
     this.g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const areaW = Math.min(this.cssW, MAX_LANES_WIDTH);
-    this.x0 = (this.cssW - areaW) / 2;
-    this.laneW = areaW / LANE_COUNT;
-    this.judgeY = this.cssH * JUDGE_Y_RATIO;
+    const l = computeLayout(this.cssW, this.cssH);
+    this.x0 = l.x0;
+    this.laneW = l.laneW;
+    this.judgeY = l.judgeY;
+    this.labelTop = l.labelTop;
+    this.labelH = l.labelH;
+    this.noteR = l.noteR;
   }
 
   /**
@@ -80,7 +85,7 @@ export class Renderer {
    */
   draw(game, t, grid, labels) {
     const g = this.g;
-    const { x0, laneW, judgeY, cssW, cssH } = this;
+    const { x0, laneW, judgeY, cssW, cssH, labelTop, labelH } = this;
     const areaW = laneW * LANE_COUNT;
 
     g.fillStyle = '#12141a';
@@ -144,7 +149,7 @@ export class Renderer {
     }
 
     // ノーツ(時刻順なので、画面外の未来に来たらbreak)
-    const r = Math.min(laneW * 0.36, 28);
+    const r = this.noteR;
     for (const n of game.notes) {
       const dt = n.time - t;
       if (dt > FALL_SEC + 0.1) break;
@@ -191,9 +196,9 @@ export class Renderer {
       g.fill();
       g.globalAlpha = (1 - p) * 0.85;
       g.strokeStyle = RESULT_COLOR[fx.result];
-      g.lineWidth = 4 * (1 - p) + 1;
+      g.lineWidth = (HIT_RING_LINE_MAX - 1) * (1 - p) + 1;
       g.beginPath();
-      g.arc(cx, judgeY, r * (1 + 0.9 * p), 0, Math.PI * 2);
+      g.arc(cx, judgeY, r * (HIT_RING_START + HIT_RING_GROW * p), 0, Math.PI * 2);
       g.stroke();
       g.globalAlpha = 1;
     }
@@ -208,18 +213,18 @@ export class Renderer {
 
     // 下部ラベル(キー/音/手)
     g.fillStyle = '#0d0f14';
-    g.fillRect(x0, judgeY + 2, areaW, cssH - judgeY);
+    // 判定ラインの下には ringMargin ぶんの余白(レーンの背景のまま)を空け、リングが切れないようにする
+    g.fillRect(x0, labelTop, areaW, labelH);
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    const labelH = cssH - judgeY;
     for (let i = 0; i < LANE_COUNT; i++) {
       const cx = x0 + (i + 0.5) * laneW;
       g.fillStyle = SOUND_COLOR[LANES[i].sound];
-      g.font = `bold ${Math.min(laneW * 0.4, 26)}px ${FONT}`;
-      g.fillText(LANES[i].keyLabel, cx, judgeY + labelH * 0.38);
+      g.font = `bold ${Math.min(laneW * 0.4, 26, labelH * 0.42)}px ${FONT}`;
+      g.fillText(LANES[i].keyLabel, cx, labelTop + labelH * 0.38);
       g.fillStyle = '#8a91a1';
-      g.font = `${Math.min(laneW * 0.26, 16)}px ${FONT}`;
-      g.fillText(`${LANES[i].hand === 'L' ? '左' : '右'}${LANES[i].soundLabel}`, cx, judgeY + labelH * 0.7);
+      g.font = `${Math.min(laneW * 0.26, 16, labelH * 0.27)}px ${FONT}`;
+      g.fillText(`${LANES[i].hand === 'L' ? '左' : '右'}${LANES[i].soundLabel}`, cx, labelTop + labelH * 0.7);
     }
 
     // HUD

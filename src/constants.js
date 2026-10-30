@@ -46,6 +46,14 @@ export const METRONOME_LOOKAHEAD_SEC = 0.25;
 export const SECTION_LABEL_BARS = 2;
 export const SECTION_FADE_IN_SEC = 0.3;
 export const SECTION_FADE_OUT_SEC = 0.5;
+/** ノーツの半径: レーン幅の割合(上限あり) */
+export const NOTE_RADIUS_RATIO = 0.36;
+export const NOTE_RADIUS_MAX = 28;
+/** ヒットエフェクトのリング: 半径は START → START+GROW (ノーツ半径の倍率)、線幅は最大 LINE_MAX px から1pxへ。
+ *  判定ラインの下の余白(layout.js)はここから計算する */
+export const HIT_RING_START = 1.0;
+export const HIT_RING_GROW = 0.9;
+export const HIT_RING_LINE_MAX = 5;
 /** ヒットエフェクト(判定ライン上のリング)の表示時間 */
 export const HIT_EFFECT_SEC = 0.3;
 /** 最後のノーツ後、リザルトへ移るまでの余韻 */

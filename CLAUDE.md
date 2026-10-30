@@ -35,6 +35,7 @@
   - 帯の中心は判定オフセット分ずれる(`windowBands(offsetSec)`)。判定が実際に通る範囲を示すため。白い判定ライン自体は動かない
   - 未判定ノーツは、GOOD帯に入ると明るい色、PERFECT帯に入ると更に明るく+光る(`zoneOfNote`。判定と同じ `judgeDelta` を使う)
   - 叩いたレーンの判定ライン上にヒットエフェクト(リング、0.3秒)。PERFECT/GOOD のみで、MISSED と空打ちは出さない(`Game.laneEffects`)
+  - リングが切れないよう、判定ラインの下に余白を確保する(`layout.js` の `ringMargin` = リング最大半径を切り上げ。`HIT_RING_*` 定数から計算するのでエフェクトのサイズ変更に追従)。判定ライン(canvas高さの0.8)・落下距離・帯の幅は変えず、キー表示の帯がその余白の下に下がる
 - 全部自動演奏(お手本): 開始画面のチェックで ON/OFF。譜面の確認とお手本が目的
   - 全ノーツを、自動音と同じ先読みスケジュール(`AudioContext.currentTime` 基準・0.25秒)で時刻ちょうどに予約して鳴らす(`selectAutoNotes(notes, true)`)。MISSED確定後に鳴らす方式は不可
   - ノーツは時刻ちょうどに PERFECT として消化され(`Game` の `autoAll`)、その瞬間に判定ライン上のヒットエフェクトとレーンの光が出る。判定オフセットは掛けない
@@ -88,6 +89,7 @@ src/
   songIndex.js  songs/index.json の検証と曲の選択(純粋)
   chartLoader.js ?chart= と index.json から譜面を用意(fetchあり)。失敗時は default → demo + 警告
   judge.js      判定窓/曲ランク/判定帯の位置(純粋)
+  layout.js     canvasレイアウト(判定ライン位置・リングの余白)(純粋)
   game.js       ゲーム状態(スコア/コンボ/判定)。時刻は引数
   voices.js     合成音 Voice と sampleVoice(録音差し替え用)
   audio.js      AudioEngine(unlock / 再生)
