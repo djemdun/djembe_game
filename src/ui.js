@@ -22,10 +22,9 @@ function el(id) {
  * @param {Settings} p.settings
  * @param {number | null} p.urlSpeed URLの ?speed=。指定があれば設定の速さより優先される
  * @param {(s: Settings) => void} p.onSettingsChange
- * @param {(on: boolean) => void} p.onAutoAllChange 全部自動演奏のON/OFF(保存しない: 開くたびにOFF)
- * @param {() => void} p.onStart
+ * @param {(autoAll: boolean) => void} p.onStart 開始。true = 自動演奏(お手本)。押したボタンでモードが決まる
  */
-export function createUi({ initialOffsetMs, onOffsetChange, settings, urlSpeed, onSettingsChange, onAutoAllChange, onStart }) {
+export function createUi({ initialOffsetMs, onOffsetChange, settings, urlSpeed, onSettingsChange, onStart }) {
   const overlay = el('overlay');
   const title = el('screen-title');
   const result = el('screen-result');
@@ -48,8 +47,10 @@ export function createUi({ initialOffsetMs, onOffsetChange, settings, urlSpeed, 
   slider.addEventListener('input', () => setOffset(Number(slider.value)));
   el('offset-minus').addEventListener('click', () => setOffset(Number(slider.value) - 5));
   el('offset-plus').addEventListener('click', () => setOffset(Number(slider.value) + 5));
-  el('start-btn').addEventListener('click', onStart);
-  el('retry-btn').addEventListener('click', onStart);
+  // どのボタンもクリックの中で同期的に onStart を呼ぶ(main 側で AudioContext の unlock が最初の await より前に走る)
+  el('start-btn').addEventListener('click', () => onStart(false));
+  el('auto-btn').addEventListener('click', () => onStart(true));
+  el('retry-btn').addEventListener('click', () => onStart(false));
 
   // --- 設定(拍音・拍線・速さ) ---
   let current = { ...settings };
@@ -72,10 +73,6 @@ export function createUi({ initialOffsetMs, onOffsetChange, settings, urlSpeed, 
   });
   beatVol.addEventListener('input', () => update({ beatVolume: Number(beatVol.value) / 100 }));
   beatLines.addEventListener('change', () => update({ beatLines: beatLines.checked }));
-
-  const autoAll = /** @type {HTMLInputElement} */ (el('set-auto-all'));
-  autoAll.checked = false;
-  autoAll.addEventListener('change', () => onAutoAllChange(autoAll.checked));
 
   const speedSlider = /** @type {HTMLInputElement} */ (el('set-speed'));
   const speedOutput = el('speed-output');

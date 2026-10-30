@@ -24,8 +24,6 @@ const renderer = new Renderer(canvas);
 
 let offsetMs = loadOffsetMs();
 let settings = loadSettings();
-/** 全部自動演奏(お手本)。保存しない: ページを開くたびにOFF */
-let autoAll = false;
 /** @type {'title' | 'playing' | 'result'} */
 let state = 'title';
 /** @type {Game | null} */
@@ -47,18 +45,16 @@ const ui = createUi({
   },
   settings,
   urlSpeed,
-  onAutoAllChange: (on) => {
-    autoAll = on;
-  },
   onSettingsChange: (s) => {
     settings = s;
     saveSettings(s);
   },
-  onStart: () => void start(),
+  onStart: (auto) => void start(auto),
 });
 chartPromise.then((loaded) => ui.showSongInfo({ ...loaded, bpm: loaded.chart.bpm }));
 
-async function start() {
+/** @param {boolean} autoAll 自動演奏(お手本)モードで開始するか。押したボタンで決まり、状態は持たない */
+async function start(autoAll) {
   if (state === 'playing') return;
   // unlock()はクリックハンドラ内で同期的に呼ぶ(autoplay制限)。awaitはその後。
   await audio.unlock();

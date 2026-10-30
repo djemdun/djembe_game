@@ -15,7 +15,10 @@
       <h1>ジャンベ音ゲー</h1>
       <p id="song-title" class="hint"></p>
       <ul id="warnings" hidden></ul>
-      <button id="start-btn" class="primary" type="button">タップして開始</button>
+      <div class="start-row">
+        <button id="start-btn" class="primary" type="button">タップして開始</button>
+        <button id="auto-btn" class="secondary" type="button">自動演奏</button>
+      </div>
       <p class="hint">キー: A S D | J K L ／ 画面タップ(マルチタッチ可)</p>
     </section>
 
@@ -39,7 +42,6 @@
       <label class="check"><input id="set-beat-lines" type="checkbox"> 拍線</label>
       <label class="slider">速さ <input id="set-speed" type="range"> <output id="speed-output"></output></label>
       <p id="speed-note" class="hint" hidden></p>
-      <label class="check"><input id="set-auto-all" type="checkbox" autocomplete="off"> 全部自動演奏(お手本・採点なし)</label>
     </div>
 
     <div id="offset-panel" class="panel">
