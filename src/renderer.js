@@ -227,10 +227,11 @@ export class Renderer {
     g.textAlign = 'left';
     g.fillStyle = '#fff';
     g.font = `bold 22px ${FONT}`;
-    g.fillText(`SCORE ${game.score}`, x0 + 12, 32);
+    // 全部自動演奏(お手本)中は採点しないので、スコア・コンボ・判定文字の代わりに表示だけ出す
+    g.fillText(game.autoAll ? 'AUTO PLAY' : `SCORE ${game.score}`, x0 + 12, 32);
 
     g.textAlign = 'center';
-    if (game.combo >= 2) {
+    if (!game.autoAll && game.combo >= 2) {
       g.font = `bold 40px ${FONT}`;
       g.fillStyle = '#fff';
       g.fillText(String(game.combo), x0 + areaW / 2, judgeY * 0.38);
@@ -254,7 +255,7 @@ export class Renderer {
     }
 
     const j = game.lastJudgement;
-    if (j && t - j.at < 0.5) {
+    if (!game.autoAll && j && t - j.at < 0.5) {
       g.globalAlpha = 1 - (t - j.at) / 0.5;
       g.fillStyle = RESULT_COLOR[j.result];
       g.font = `bold 30px ${FONT}`;

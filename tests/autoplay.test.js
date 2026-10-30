@@ -60,3 +60,32 @@ test('フラムの自動音: 前打音と本音の2つが、本音の直前・�
 test('autoPlayの無い譜面では空', () => {
   assert.deepEqual(selectAutoNotes(play(chart([note(0), note(1)]))), []);
 });
+
+// --- 全部自動演奏 ---
+test('selectAutoNotes(all): autoPlayの印に関係なく全ノーツを時刻順に', () => {
+  const notes = play(chart([note(3), note(1, { autoPlay: true }), note(2)]));
+  assert.equal(selectAutoNotes(notes).length, 1);
+  const all = selectAutoNotes(notes, true);
+  assert.equal(all.length, 3);
+  assert.deepEqual(all.map((n) => n.time), [...all.map((n) => n.time)].sort((a, b) => a - b));
+});
+
+test('全部自動演奏: 窓を連結すると全ノーツが重複・欠落なく1回ずつ出る(フラム含む)', () => {
+  const c = chart([note(0, { flam: true }), note(0.5), note(1), note(1.5, { flam: true }), note(2), note(3.5)], 130);
+  const all = selectAutoNotes(play(c), true);
+  assert.equal(all.length, 8); // フラム2つ → 前打音が2つ増える
+  const got = [];
+  for (let t = 0; t < 12; t += 0.0833) got.push(...autoNotesInWindow(all, t, t + 0.0833));
+  assert.deepEqual(got, all);
+});
+
+test('全部自動演奏: リードイン中は鳴らず、速さ倍率が時刻に反映される', () => {
+  for (const speed of [0.5, 0.85, 1, 1.5]) {
+    const c = withSpeed(chart([note(0), note(4)]), speed);
+    const g = gridOf(c);
+    const all = selectAutoNotes(play(c), true);
+    assert.equal(autoNotesInWindow(all, 0, leadInSec(g)).length, 0); // カウントイン中は空
+    near(all[0].time, leadInSec(g));
+    near(all[1].time, leadInSec(g) + 4 * 60 / c.bpm);
+  }
+});

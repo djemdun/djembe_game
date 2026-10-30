@@ -24,6 +24,8 @@ const renderer = new Renderer(canvas);
 
 let offsetMs = loadOffsetMs();
 let settings = loadSettings();
+/** 全部自動演奏(お手本)。保存しない: ページを開くたびにOFF */
+let autoAll = false;
 /** @type {'title' | 'playing' | 'result'} */
 let state = 'title';
 /** @type {Game | null} */
@@ -45,6 +47,9 @@ const ui = createUi({
   },
   settings,
   urlSpeed,
+  onAutoAllChange: (on) => {
+    autoAll = on;
+  },
   onSettingsChange: (s) => {
     settings = s;
     saveSettings(s);
@@ -61,8 +66,8 @@ async function start() {
   // 速さ倍率はBPMに掛ける。URL指定があれば設定より優先
   const chart = withSpeed(loaded.chart, urlSpeed ?? settings.speed);
   const grid = gridOf(chart);
-  game = new Game(buildPlayNotes(chart, leadInSec(grid)));
-  game.offsetSec = offsetMs / 1000;
+  game = new Game(buildPlayNotes(chart, leadInSec(grid)), { autoAll });
+  game.offsetSec = autoAll ? 0 : offsetMs / 1000; // 自動演奏は譜面の時刻ちょうど
   audio.setClickVolume(settings.beatVolume);
   startTime = audio.now;
   // 拍音・自動音・拍線は、ノーツと同じ格子・同じ曲時間から作る。判定オフセットは掛けない
@@ -72,7 +77,7 @@ async function start() {
       new LookaheadScheduler(audio, startTime, (a, b) => beatsInWindow(grid, a, b), (e, when) => audio.playClick(e.accent, when)),
     );
   }
-  const autoNotes = selectAutoNotes(game.notes);
+  const autoNotes = selectAutoNotes(game.notes, autoAll);
   if (autoNotes.length > 0) {
     // 自動音: 判定の結果(MISSED等)を待たず、ノーツの時刻ちょうどに予約して鳴らす
     schedulers.push(
@@ -114,6 +119,12 @@ function frame() {
   game.update(t);
   renderer.draw(game, t, beatGrid, labels);
   if (game.isFinished(t)) {
+    if (game.autoAll) {
+      // お手本は採点しないのでリザルトを出さず、開始画面へ戻る
+      state = 'title';
+      ui.showTitle();
+      return;
+    }
     state = 'result';
     ui.showResult({
       rank: songRank(game.counts),

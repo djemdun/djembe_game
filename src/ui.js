@@ -22,9 +22,10 @@ function el(id) {
  * @param {Settings} p.settings
  * @param {number | null} p.urlSpeed URLの ?speed=。指定があれば設定の速さより優先される
  * @param {(s: Settings) => void} p.onSettingsChange
+ * @param {(on: boolean) => void} p.onAutoAllChange 全部自動演奏のON/OFF(保存しない: 開くたびにOFF)
  * @param {() => void} p.onStart
  */
-export function createUi({ initialOffsetMs, onOffsetChange, settings, urlSpeed, onSettingsChange, onStart }) {
+export function createUi({ initialOffsetMs, onOffsetChange, settings, urlSpeed, onSettingsChange, onAutoAllChange, onStart }) {
   const overlay = el('overlay');
   const title = el('screen-title');
   const result = el('screen-result');
@@ -71,6 +72,10 @@ export function createUi({ initialOffsetMs, onOffsetChange, settings, urlSpeed, 
   });
   beatVol.addEventListener('input', () => update({ beatVolume: Number(beatVol.value) / 100 }));
   beatLines.addEventListener('change', () => update({ beatLines: beatLines.checked }));
+
+  const autoAll = /** @type {HTMLInputElement} */ (el('set-auto-all'));
+  autoAll.checked = false;
+  autoAll.addEventListener('change', () => onAutoAllChange(autoAll.checked));
 
   const speedSlider = /** @type {HTMLInputElement} */ (el('set-speed'));
   const speedOutput = el('speed-output');

@@ -10,9 +10,14 @@ import { judgeDelta, GOOD_WINDOW_SEC } from './judge.js';
  * DOM/AudioContext に依存しないので単体テストしやすい。
  */
 export class Game {
-  /** @param {PlayNote[]} notes 時刻順 */
-  constructor(notes) {
+  /**
+   * @param {PlayNote[]} notes 時刻順
+   * @param {{ autoAll?: boolean }} [opts] autoAll: 全部自動演奏(お手本)。ノーツは時刻ちょうどに
+   *   PERFECT として消化され、プレイヤーの入力は判定に使わない(音は呼び出し側が鳴らす)
+   */
+  constructor(notes, opts = {}) {
     this.notes = notes;
+    this.autoAll = opts.autoAll === true;
     /** @type {PlayNote[][]} レーンごとの時刻順キュー */
     this.queues = Array.from({ length: LANE_COUNT }, () => []);
     for (const n of notes) this.queues[n.lane].push(n);
@@ -44,6 +49,7 @@ export class Game {
    */
   hit(lane, songTime) {
     this.laneHitAt[lane] = songTime;
+    if (this.autoAll) return null;
     const note = this.queues[lane][this.heads[lane]];
     if (!note) return null;
     const deltaSec = songTime - this.offsetSec - note.time;
@@ -60,11 +66,32 @@ export class Game {
    * @param {number} songTime
    */
   update(songTime) {
+    if (this.autoAll) {
+      this.#autoPlayUntil(songTime);
+      return;
+    }
     const t = songTime - this.offsetSec;
     for (let lane = 0; lane < LANE_COUNT; lane++) {
       const q = this.queues[lane];
       while (this.heads[lane] < q.length && t - q[this.heads[lane]].time > GOOD_WINDOW_SEC) {
         this.#settle(q[this.heads[lane]++], 'MISSED', null, songTime);
+      }
+    }
+  }
+
+  /**
+   * 全部自動演奏: 時刻に達したノーツを、その時刻ちょうどにPERFECTとして消化し、
+   * 判定ライン上のエフェクトとレーンの光を出す(判定オフセットは掛けない)。
+   * @param {number} songTime
+   */
+  #autoPlayUntil(songTime) {
+    for (let lane = 0; lane < LANE_COUNT; lane++) {
+      const q = this.queues[lane];
+      while (this.heads[lane] < q.length && q[this.heads[lane]].time <= songTime) {
+        const note = q[this.heads[lane]++];
+        this.#settle(note, 'PERFECT', 0, note.time);
+        this.laneEffects[lane] = { result: 'PERFECT', at: note.time };
+        this.laneHitAt[lane] = note.time;
       }
     }
   }

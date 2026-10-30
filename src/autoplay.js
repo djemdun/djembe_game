@@ -4,12 +4,13 @@
 /** @typedef {import('./types.js').PlayNote} PlayNote */
 
 /**
- * 自動音の対象だけを時刻順に抜き出す。
+ * 自動音の対象を時刻順に抜き出す。
  * @param {PlayNote[]} notes
+ * @param {boolean} [all] true なら autoPlay の印に関係なく全ノーツ(全部自動演奏モード)
  * @returns {PlayNote[]}
  */
-export function selectAutoNotes(notes) {
-  return notes.filter((n) => n.autoPlay).sort((a, b) => a.time - b.time);
+export function selectAutoNotes(notes, all = false) {
+  return notes.filter((n) => all || n.autoPlay).sort((a, b) => a.time - b.time);
 }
 
 /**
