@@ -82,7 +82,7 @@ export class Renderer {
 
   /**
    * レーンの背後に、ジャンベを上から見た絵を薄く描く。ノーツ・帯・拍線より先に描くので上に重なる。
-   * 叩いた位置の光は game.laneEffects(ヒットエフェクトと同じ情報)から出すため、色・長さ・条件が揃う。
+   * 叩いた位置の光は game.laneEffects(ヒットエフェクトと同じ情報)から出すため、長さ・条件が揃う。色は音の色。
    * @param {Game} game
    * @param {number} t
    */
@@ -108,7 +108,9 @@ export class Renderer {
     for (const glow of activeGlows(game.laneEffects, t)) {
       const a = drumZoneArc(d, glow.sound, glow.hand);
       g.globalAlpha = glow.fade * DRUM_GLOW_ALPHA;
-      g.fillStyle = RESULT_COLOR[glow.result];
+      // 色相は音の色(ノーツ・レーンと同じ)。判定は明るさで示す(ノーツが帯に入ったときと同じ GOOD < PERFECT)。
+      // 判定の色(PERFECT=黄・GOOD=青)をそのまま使うと、音の色(高=黄・中=青)と区別がつかなくなるため
+      g.fillStyle = glow.result === 'PERFECT' ? PERFECT_ZONE_COLOR[glow.sound] : GOOD_ZONE_COLOR[glow.sound];
       g.beginPath();
       g.arc(a.cx, a.cy, a.rOut, a.a0, a.a1, false);
       g.arc(a.cx, a.cy, a.rIn, a.a1, a.a0, true);
