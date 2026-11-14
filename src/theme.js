@@ -28,7 +28,7 @@ export const THEME = {
     missedAlpha: 0.3, // MISSEDノーツの不透明度
   },
 
-  // 判定の色。判定の文字・ずれ(ms)の表示・ヒットリング・太鼓の光で共通
+  // 判定の色。判定の文字・ずれ(ms)の表示・ヒットリングで共通
   judgement: {
     PERFECT: '#fcd66f', // PERFECT
     GOOD: '#ffffff', // GOOD  
@@ -51,7 +51,7 @@ export const THEME = {
   drum: {
     skin: 'rgba(255, 255, 255, 0.07)', // 皮の塗り
     line: 'rgba(255, 255, 255, 0.07)', // 外周とゾーンの境目の線
-    glowAlpha: 0.5, // 叩いた位置が光る最大不透明度(時間とともに薄くなる)。色は judgement
+    glowAlpha: 0.5, // 叩いた位置が光る最大不透明度(時間とともに薄くなる)。色は叩いた音の色
   },
 
   // 拍線(横線)
@@ -74,14 +74,14 @@ export const THEME = {
 
   // 叩いたときに判定ラインと判定帯が一瞬光る。色は PERFECT/GOOD 共通の1色で、強さだけ変える
   judgeFlash: {
-    color: '#fcd66f', // 光の色(金)
+    color: '#ffffff', // 光の色(白)
     PERFECT: {
-      bandAlpha: 0.5, // PERFECT のとき、判定帯(GOOD の範囲)の塗りの最大不透明度(時間とともに薄くなる)
+      bandAlpha: 0.5, // PERFECT のとき、判定帯(GOOD の範囲)の塗りの最大不透明度(時間とともに薄くなる)。ラインの周りには光のにじみも付く
       lineAlpha: 1, // PERFECT のとき、光るラインの最大不透明度
     },
     GOOD: {
-      bandAlpha: 0.2, // GOOD のとき、判定帯の塗りの最大不透明度
-      lineAlpha: 0.6, // GOOD のとき、光るラインの最大不透明度
+      bandAlpha: 0, // GOOD のとき、判定帯の塗りの最大不透明度(0 = 帯は光らせない。PERFECT との違いを有無で出すため)
+      lineAlpha: 0, // GOOD のとき、光るラインの最大不透明度(0 = 光らせない。PERFECT だけバーが光る)
     },
   },
 

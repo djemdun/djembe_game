@@ -12,6 +12,8 @@ import { THEME } from './theme.js';
 /** PERFECT帯のノーツの発光のぼかし(px)と縁取りの太さ。色ではないので theme には置かない */
 const PERFECT_GLOW_BLUR = 18;
 const PERFECT_OUTLINE_WIDTH = 3;
+/** PERFECT のとき、判定ラインの周りに付く光のにじみの大きさ(px) */
+const PERFECT_HALO_BLUR = 24;
 /** 叩いたレーンが光る長さ(秒) */
 const LANE_FLASH_SEC = 0.18;
 
@@ -110,7 +112,7 @@ export function drawBands(g, { x, w, goodTop, goodBottom, perfectTop, perfectBot
 }
 
 /**
- * 叩いたレーンの判定帯を、金色で一瞬光らせる(時間とともに薄くなる)。
+ * 叩いたレーンの判定帯を、白で一瞬光らせる(時間とともに薄くなる)。
  * @param {CanvasRenderingContext2D} g
  * @param {{ x: number, w: number, top: number, bottom: number, result: 'PERFECT' | 'GOOD', progress: number }} p progress 0..1
  */
@@ -123,7 +125,7 @@ export function drawBandFlash(g, { x, w, top, bottom, result, progress }) {
 }
 
 /**
- * 叩いたレーンの判定ラインを、金色で太く光らせる(普段のラインの上に重ね、時間とともに薄くなる)。
+ * 叩いたレーンの判定ラインを、白で光らせる(PERFECT は太く+にじみ、GOOD は普段と同じ太さでわずかに明るくなるだけ。普段のラインの上に重ね、時間とともに薄くなる)。
  * @param {CanvasRenderingContext2D} g
  * @param {{ x: number, w: number, y: number, result: 'PERFECT' | 'GOOD', progress: number }} p progress 0..1
  */
@@ -131,7 +133,12 @@ export function drawLineFlash(g, { x, w, y, result, progress }) {
   g.save();
   g.globalAlpha = THEME.judgeFlash[result].lineAlpha * (1 - progress);
   g.strokeStyle = THEME.judgeFlash.color;
-  g.lineWidth = result === 'PERFECT' ? 6 : 4; // 普段のラインは3
+  g.lineWidth = result === 'PERFECT' ? 6 : 3; // 普段のラインは3
+  if (result === 'PERFECT') {
+    // PERFECT だけ光のにじみを付ける(GOOD は細いラインが光るだけ。違いを「あるかないか」で出す)
+    g.shadowColor = THEME.judgeFlash.color;
+    g.shadowBlur = PERFECT_HALO_BLUR;
+  }
   g.beginPath();
   g.moveTo(x, y);
   g.lineTo(x + w, y);
@@ -232,7 +239,7 @@ export function drawDrumBase(g, d, zoneRadii) {
 export function drawDrumGlow(g, d, glow) {
   const a = drumZoneArc(d, glow.sound, glow.hand);
   g.globalAlpha = glow.fade * THEME.drum.glowAlpha;
-  g.fillStyle = THEME.judgement[glow.result];
+  g.fillStyle = THEME.sound[glow.sound];
   g.beginPath();
   g.arc(a.cx, a.cy, a.rOut, a.a0, a.a1, false);
   g.arc(a.cx, a.cy, a.rIn, a.a1, a.a0, true);

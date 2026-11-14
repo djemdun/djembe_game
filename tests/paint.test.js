@@ -52,7 +52,7 @@ test('drawNote: PERFECT帯だけ 音の色の発光と縁取り。MISSED は不�
   assert.equal(m.setBefore('fillStyle', 'beginPath'), THEME.note.missed);
 });
 
-test('drawHitEffect / drawDrumGlow: 色は判定の色、叩いた瞬間の不透明度は theme の値', () => {
+test('drawHitEffect / drawDrumGlow: ヒットリングは判定の色・太鼓の光は音の色(PERFECTもGOODも同じ)、叩いた瞬間の不透明度は theme の値', () => {
   for (const result of /** @type {const} */ (['PERFECT', 'GOOD'])) {
     const h = fakeCtx();
     drawHitEffect(h.g, { cx: 0, y: 0, r: 10, result, progress: 0 });
@@ -62,7 +62,7 @@ test('drawHitEffect / drawDrumGlow: 色は判定の色、叩いた瞬間の不�
 
     const d = fakeCtx();
     drawDrumGlow(d.g, { cx: 0, cy: 0, r: 100 }, { sound: 'mid', hand: 'L', result, fade: 1 });
-    assert.equal(d.setBefore('fillStyle', 'beginPath'), THEME.judgement[result]);
+    assert.equal(d.setBefore('fillStyle', 'beginPath'), THEME.sound.mid);
     assert.equal(d.setBefore('globalAlpha', 'beginPath'), THEME.drum.glowAlpha);
   }
 });
