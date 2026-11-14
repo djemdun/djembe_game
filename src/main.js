@@ -1,4 +1,3 @@
-import { LANES } from './constants.js';
 import { AudioEngine } from './audio.js';
 import { buildPlayNotes, withSpeed } from './chart.js';
 import { gridOf, leadInSec, beatsInWindow } from './beats.js';
@@ -133,9 +132,11 @@ attachInput({
   laneAt: (x) => renderer.laneAt(x),
   onHit: (lane, ts) => {
     if (state !== 'playing' || !game) return;
-    game.hit(lane, songTimeOfEvent(ts));
-    // 判定の成否に関わらず、叩いたレーンの音は鳴らす(空打ちも楽器として鳴る)
-    audio.play(LANES[lane].sound);
+    const t = songTimeOfEvent(ts);
+    const sound = game.soundFor(lane, t); // hit() が次のノーツへ進める前に決める
+    game.hit(lane, t);
+    // 判定の成否に関わらず、叩いたレーンの音は鳴らす(空打ちも楽器として鳴る)。クラップのノーツを叩くときはクラップ音
+    audio.play(sound);
   },
 });
 

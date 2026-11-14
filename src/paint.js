@@ -196,7 +196,7 @@ export function drawDrumBase(g, d, zoneRadii) {
  * 太鼓の叩いた位置の光。色は判定の色(ヒットエフェクトと同じ)。
  * @param {CanvasRenderingContext2D} g
  * @param {{ cx: number, cy: number, r: number }} d
- * @param {{ sound: Sound, hand: import('./types.js').Hand, result: 'PERFECT' | 'GOOD', fade: number }} glow
+ * @param {{ sound: import('./types.js').LaneSound, hand: import('./types.js').Hand, result: 'PERFECT' | 'GOOD', fade: number }} glow
  *   fade: 1(叩いた瞬間)→ 0(消える)
  */
 export function drawDrumGlow(g, d, glow) {

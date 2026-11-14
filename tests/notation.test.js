@@ -215,3 +215,56 @@ test('songs/djole.txt: 22小節・警告なし・構成どおり(合図→伴奏
   assert.equal(auto.length, 9);
   assert.ok(auto.every((n) => n.beat < 8));
 });
+
+// ---- 連符(n/m + n個の音。mは省略可で4) ----
+const near = (/** @type {number} */ a, /** @type {number} */ b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} ≒ ${b}`);
+const beatsOf = (/** @type {string} */ body) => parseBody(`[A]\n${body}`).chart.notes.map((n) => n.beat);
+
+test('連符: 拍位置(3/4 = 2/3拍刻み、3/2 = 1/3拍刻み、3/1 = 1/6拍刻み)', () => {
+  const a = beatsOf('3タタタッッッッッッッッッッッ'); // 3/4 + 12文字ぶん休符
+  near(a[0], 0); near(a[1], 2 / 3); near(a[2], 4 / 3);
+  const b = beatsOf('3/2タタタッッッッッッッッッッッッッッ');
+  near(b[0], 0); near(b[1], 1 / 3); near(b[2], 2 / 3);
+  const c = beatsOf('3/1タタタッッッッッッッッッッッッッッッ');
+  near(c[0], 0); near(c[1], 1 / 6); near(c[2], 2 / 6);
+});
+
+test('連符: 前後の音の位置は占めた長さで数える(ドッドッ3タタタ の次の行頭は8文字ぶん = 4拍)', () => {
+  const r = parseBody('[A]\nドッドッ3タタタドッドッ3タタタ');
+  const b = r.chart.notes.map((n) => n.beat);
+  near(b[0], 0); near(b[1], 1);
+  near(b[2], 2); near(b[3], 2 + 2 / 3); near(b[4], 2 + 4 / 3);
+  near(b[5], 4); near(b[6], 5);
+  near(b[7], 6);
+  assert.equal(r.chart.totalBeats, 8);
+});
+
+test('連符: 手は開始位置の奇偶で決め、中は交互。後ろの位置は span ぶん進む', () => {
+  const r = parseBody('[A]\nドッドッ3タタタドッドッ3タタタ');
+  const hands = r.chart.notes.map((n) => n.hand).join('');
+  // ド(位置1)R, ド(位置3)R, 連符は位置5(奇数)から R L R, ド(位置9)R, ド(位置11)R, 連符 位置13 R L R
+  assert.equal(hands, 'RRRLRRRRLR');
+  // 3/1 は1文字ぶん進むので、後ろの位置の奇偶が変わる: 位置1から連符(1文字) → 次のドは位置2 = 左
+  const q = parseBody('[A]\n3/1タタタドッッッッッッッッッッッ').chart.notes;
+  assert.deepEqual(q.map((n) => n.hand), ['R', 'L', 'R', 'L']);
+});
+
+test('連符: 休符・全角の数字とスラッシュ・音の混在・autoPlay', () => {
+  const r = parseNotation(`${HEADER}\n[A] 自動音\n３／２トッカッッッッッッッッッッッッッッ`);
+  assert.deepEqual(r.warnings, []);
+  assert.deepEqual(r.chart.notes.map((n) => n.sound), ['mid', 'clap']);
+  near(r.chart.notes[1].beat, 2 / 3); // 3/2 は1/3拍刻み。3音目(カ)は 2/3 拍
+  assert.ok(r.chart.notes.every((n) => n.autoPlay === true));
+});
+
+test('連符: 音が足りない・数字が不正・フラム入りは警告', () => {
+  const few = parseBody('[A]\nッッッッッッッッッッッッッ3タタ');
+  assert.match(few.warnings.map((w) => w.message).join('\n'), /連符「3」を無視します.*音が3個ありません/);
+  const bad = parseBody('[A]\n0タタッッッッッッッッッッッッ');
+  assert.match(bad.warnings[0].message, /音数が不正/);
+  const span0 = parseBody('[A]\n3/0タタタッッッッッッッッッッッッッ');
+  assert.match(span0.warnings[0].message, /長さ.*不正/);
+  const flam = parseBody('[A]\n3ロタタッッッッッッッッッッッッ');
+  assert.match(flam.warnings[0].message, /連符の中ではフラム/);
+  assert.equal(flam.chart.notes.every((n) => !n.flam), true);
+});

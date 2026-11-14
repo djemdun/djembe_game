@@ -1,4 +1,4 @@
-import { LANE_COUNT, NOTE_POINTS, END_PAD_SEC } from './constants.js';
+import { LANES, LANE_COUNT, NOTE_POINTS, END_PAD_SEC } from './constants.js';
 import { judgeDelta, GOOD_WINDOW_SEC } from './judge.js';
 
 /** @typedef {import('./types.js').PlayNote} PlayNote */
@@ -40,6 +40,19 @@ export class Game {
     this.laneEffects = new Array(LANE_COUNT).fill(null);
     this.judgedCount = 0;
     this.lastNoteTime = notes.length ? notes[notes.length - 1].time : 0;
+  }
+
+  /**
+   * 叩いたとき鳴らす音。そのレーンの次のノーツがクラップで判定窓の中なら clap、それ以外はレーンの音。
+   * hit() の前に呼ぶ(hit() が次のノーツへ進めてしまうため)。
+   * @param {number} lane
+   * @param {number} songTime 入力時刻(曲時間・秒)
+   * @returns {import('./types.js').Sound}
+   */
+  soundFor(lane, songTime) {
+    const note = this.queues[lane][this.heads[lane]];
+    if (note && note.sound === 'clap' && judgeDelta(songTime - this.offsetSec - note.time) !== null) return 'clap';
+    return LANES[lane].sound;
   }
 
   /**

@@ -26,7 +26,7 @@ test('lighten: 白への混ぜ具合(0 = そのまま、1 = 白)', () => {
 });
 
 test('noteColor: 未判定=音の色 / GOOD帯=goodMix / PERFECT帯=perfectMix / MISSED=missed', () => {
-  for (const sound of /** @type {const} */ (['high', 'mid', 'low'])) {
+  for (const sound of /** @type {const} */ (['high', 'mid', 'low', 'clap'])) {
     const base = THEME.sound[sound];
     assert.equal(noteColor(sound, null, null), base);
     assert.equal(noteColor(sound, null, 'GOOD'), lighten(base, THEME.note.goodMix));

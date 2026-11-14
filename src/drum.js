@@ -2,7 +2,7 @@
 
 import { LANES, HIT_EFFECT_SEC, DRUM_SIZE_RATIO, DRUM_ZONES } from './constants.js';
 
-/** @typedef {import('./types.js').Sound} Sound */
+/** @typedef {import('./types.js').LaneSound} Sound */
 /** @typedef {import('./types.js').Hand} Hand */
 /** @typedef {{ result: 'PERFECT' | 'GOOD', at: number } | null} LaneEffect */
 

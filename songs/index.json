@@ -1,8 +1,9 @@
 {
-  "default": "dansa",
+  "default": "standard",
   "songs": [
-    { "id": "fra", "title": "Fra" },
-    { "id": "djole", "title": "Djole" },
-    { "id": "dansa", "title": "Dansa" }
+    { "id": "standard", "title": "Standard" },
+    { "id": "fra", "title": "Fra", "groups": ["shinakura"] },
+    { "id": "djole", "title": "Djole", "groups": ["singha4"] },
+    { "id": "dansa", "title": "Dansa", "groups": ["singha4"] }
   ]
 }

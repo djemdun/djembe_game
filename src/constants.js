@@ -1,10 +1,10 @@
-/** @typedef {import('./types.js').Sound} Sound */
+/** @typedef {import('./types.js').LaneSound} LaneSound */
 /** @typedef {import('./types.js').Hand} Hand */
 
 /**
  * 左から順。hand+sound → レーンの対応と、キー割り当てはここが唯一の定義。
  * code は KeyboardEvent.code(キー配列に依存しない物理キー)。
- * @type {ReadonlyArray<{ hand: Hand, sound: Sound, code: string, keyLabel: string, soundLabel: string }>}
+ * @type {ReadonlyArray<{ hand: Hand, sound: LaneSound, code: string, keyLabel: string, soundLabel: string }>}
  */
 export const LANES = Object.freeze([
   { hand: 'L', sound: 'high', code: 'KeyA', keyLabel: 'A', soundLabel: '高' },
@@ -15,6 +15,8 @@ export const LANES = Object.freeze([
   { hand: 'R', sound: 'high', code: 'KeyL', keyLabel: 'L', soundLabel: '高' },
 ]);
 export const LANE_COUNT = LANES.length;
+/** クラップ(カ)は、この音のレーンを左右の手ぶん(= 左高と右高)同時に叩く。ノーツの展開は chart.js の expandClaps */
+export const CLAP_LANE_SOUND = 'high';
 
 // --- 判定(音ごと) ---
 export const PERFECT_WINDOW_MS = 60;

@@ -1,4 +1,8 @@
-/** @typedef {'high' | 'mid' | 'low'} Sound */
+/** ジャンベの打面(レーン)に対応する音 @typedef {'high' | 'mid' | 'low'} LaneSound */
+/**
+ * ノーツの音。clap(クラップ)は専用レーンを持たず、左高と右高のレーンに同時に降る(両手で叩く)。
+ * @typedef {LaneSound | 'clap'} Sound
+ */
 /** @typedef {'L' | 'R'} Hand */
 
 /**

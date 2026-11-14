@@ -1,6 +1,6 @@
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { loadChart, loadSong } from '../src/chartLoader.js';
 
 // fetch を差し替え、実際の songs/ のファイルを返す(失敗させたい URL は missing に入れる)
@@ -20,18 +20,49 @@ afterEach(() => { globalThis.fetch = realFetch; });
 const params = (/** @type {string} */ q) => new URLSearchParams(q);
 const INDEX = JSON.parse(readFileSync(new URL('../songs/index.json', import.meta.url), 'utf8'));
 
-test('loadChart: 指定なしは default の曲を読み、一覧(songs/index.json の songs)と選択中の id を返す', async () => {
-  const r = await loadChart(params(''));
+const ids = (/** @type {{ id: string }[]} */ songs) => songs.map((s) => s.id);
+
+test('loadChart: group=adminmami は default の曲を読み、全曲を選べる', async () => {
+  const r = await loadChart(params('group=adminmami'));
   assert.equal(r.id, INDEX.default);
-  assert.deepEqual(r.songs.map((s) => s.id), INDEX.songs.map((/** @type {{ id: string }} */ s) => s.id));
+  assert.deepEqual(ids(r.songs), ids(INDEX.songs));
   assert.ok(r.chart.notes.length > 0);
 });
 
-test('loadChart: ?chart=<id> はその曲を選択済みにして返す(一覧は全曲)', async () => {
-  const other = INDEX.songs.find((/** @type {{ id: string }} */ s) => s.id !== INDEX.default).id;
-  const r = await loadChart(params(`chart=${other}`));
-  assert.equal(r.id, other);
-  assert.equal(r.songs.length, INDEX.songs.length);
+test('loadChart: group 未指定は default の1曲だけ(選択不可)。?chart= で別の曲を指定しても default', async () => {
+  for (const q of ['', `chart=${SONGS.find((x) => x.id !== INDEX.default)?.id}`]) {
+    const r = await loadChart(params(q));
+    assert.equal(r.id, INDEX.default, q);
+    assert.deepEqual(ids(r.songs), [INDEX.default], q);
+  }
+});
+
+/** @type {{ id: string, groups?: string[] }[]} */
+const SONGS = INDEX.songs;
+const groupNames = [...new Set(SONGS.flatMap((s) => s.groups ?? []))];
+/** index.json の記述どおり、default + 指定グループのどれかに属する曲(一覧の順) */
+const visibleFor = (/** @type {string[]} */ gs) =>
+  SONGS.filter((s) => s.id === INDEX.default || (s.groups ?? []).some((g) => gs.includes(g))).map((s) => s.id);
+
+test('loadChart: group=<名前> は default + そのグループの曲。複数指定(カンマ・繰り返し)は和集合', async () => {
+  for (const g of groupNames) assert.deepEqual(ids((await loadChart(params(`group=${g}`))).songs), visibleFor([g]), g);
+  assert.deepEqual(ids((await loadChart(params(`group=${groupNames.join(',')}`))).songs), visibleFor(groupNames));
+  assert.deepEqual(
+    ids((await loadChart(params(groupNames.map((g) => `group=${g}`).join('&')))).songs),
+    visibleFor(groupNames),
+  );
+});
+
+test('loadChart: ?chart= は見える曲の中でだけ有効(見えない曲は警告して default)', async () => {
+  const g = groupNames[0];
+  const inside = SONGS.find((s) => s.groups?.includes(g) && existsSync(new URL(`../songs/${s.id}.txt`, import.meta.url)))?.id ?? INDEX.default;
+  const outside = SONGS.find((s) => s.id !== INDEX.default && !s.groups?.includes(g))?.id;
+  assert.equal((await loadChart(params(`group=${g}&chart=${inside}`))).id, inside);
+  if (outside) {
+    const ng = await loadChart(params(`group=${g}&chart=${outside}`));
+    assert.equal(ng.id, INDEX.default);
+    assert.match(ng.warnings[0].message, new RegExp(`${outside}.*一覧にありません`));
+  }
 });
 
 test('loadChart: 内蔵譜面(?chart=easy)は一覧なし(選択欄を出さない)', async () => {
@@ -50,7 +81,7 @@ test('loadChart: 一覧が読めなければ demo で一覧なし、理由を警
 
 test('loadChart: 既定の曲だけ読めないとき demo に戻るが、一覧は残る(別の曲を選べる)', async () => {
   missing.add(`songs/${INDEX.default}.txt`);
-  const r = await loadChart(params(''));
+  const r = await loadChart(params('group=adminmami'));
   assert.equal(r.id, 'demo');
   assert.equal(r.songs.length, INDEX.songs.length);
 });

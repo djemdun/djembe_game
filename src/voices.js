@@ -1,4 +1,5 @@
 /** @typedef {import('./types.js').Sound} Sound */
+/** @typedef {import('./types.js').LaneSound} LaneSound */
 
 /**
  * 1音を `when`(AudioContext時間)に鳴らす関数。
@@ -30,7 +31,7 @@ export function sampleVoice(buffer) {
  * @typedef {{ tones: ToneLayer[], noises: NoiseLayer[] }} DrumParams
  */
 
-/** 仮の合成音のパラメータ。音色を変えるときはここを編集する(dev/sound-test.html で試聴できる) @type {Record<Sound, DrumParams>} */
+/** 仮の合成音のパラメータ。音色を変えるときはここを編集する(dev/sound-test.html で試聴できる) @type {Record<LaneSound, DrumParams>} */
 export const DRUM_PARAMS = {
   // 木の太鼓らしい太さを優先した音(試聴ページのプリセット7をもとに調整)。以前は 950→700Hz のサイン波 + 2500Hz以上のノイズ
   high: {
@@ -48,6 +49,25 @@ export const DRUM_PARAMS = {
     tones: [{ f0: 150, f1: 55, decay: 0.4, gain: 0.95 }],
     noises: [{ type: 'lowpass', freq: 400, q: 1, decay: 0.04, gain: 0.25 }],
   },
+};
+
+/**
+ * クラップ(手拍子)の設計図。実際の手拍子は、手のひらが少しずつずれて当たるので、
+ * 短いノイズの連打(bursts)のあとに、少し長い余韻(tail)が続く。
+ * @typedef {{ bursts: number, spacing: number, burstDecay: number, freq: number, q: number, burstGain: number,
+ *   tailDecay: number, tailGain: number }} ClapParams
+ */
+
+/** 仮の合成クラップ。音色を変えるときはここを編集する(耳で合わせる) @type {ClapParams} */
+export const CLAP_PARAMS = {
+  bursts: 3, // 立ち上がりのノイズの連打の数
+  spacing: 0.011, // 連打の間隔(秒)
+  burstDecay: 0.014, // 連打1つの長さ(秒)
+  freq: 1500, // ノイズの中心周波数(Hz)。高いほど硬い音
+  q: 1.4, // 帯域の狭さ。大きいほど「パン」より「ピッ」に寄る
+  burstGain: 0.55,
+  tailDecay: 0.14, // 余韻の長さ(秒)
+  tailGain: 0.4,
 };
 
 /**
@@ -97,7 +117,38 @@ export function drumVoice(noiseBuf, p) {
 }
 
 /**
- * 仮の合成音(ジャンベ風)。
+ * クラップの Voice。左高と右高の2ノーツが同時に鳴る(= この Voice が同時に2回呼ばれる)ことが多いので、
+ * ノイズの読み出し開始位置を毎回ずらす。同じ位置から読むと2つが完全に同じ波形になり、重なって不自然に大きくなるため。
+ * @param {AudioBuffer} noiseBuf
+ * @param {ClapParams} p
+ * @returns {Voice}
+ */
+export function clapVoice(noiseBuf, p) {
+  // ノイズ素材(0.5秒)の中で、最長の1片(余韻)が収まる範囲から開始位置を選ぶ
+  const maxOffset = noiseBuf.duration - (p.tailDecay + 0.05);
+  return (ctx, when, dest) => {
+    /** @param {number} start @param {number} decay @param {number} gain */
+    const burst = (start, decay, gain) => {
+      const src = ctx.createBufferSource();
+      const f = ctx.createBiquadFilter();
+      const g = ctx.createGain();
+      src.buffer = noiseBuf;
+      f.type = 'bandpass';
+      f.frequency.value = p.freq;
+      f.Q.value = p.q;
+      g.gain.setValueAtTime(gain, start);
+      g.gain.exponentialRampToValueAtTime(0.001, start + decay);
+      src.connect(f).connect(g).connect(dest);
+      src.start(start, Math.random() * maxOffset);
+      src.stop(start + decay + 0.05);
+    };
+    for (let i = 0; i < p.bursts; i++) burst(when + i * p.spacing, p.burstDecay, p.burstGain);
+    burst(when + (p.bursts - 1) * p.spacing, p.tailDecay, p.tailGain); // 余韻は最後の連打から続く
+  };
+}
+
+/**
+ * 仮の合成音(ジャンベ風 + クラップ)。
  * @param {AudioContext} ctx
  * @returns {Record<Sound, Voice>}
  */
@@ -107,6 +158,7 @@ export function createSynthVoices(ctx) {
     high: drumVoice(noiseBuf, DRUM_PARAMS.high),
     mid: drumVoice(noiseBuf, DRUM_PARAMS.mid),
     low: drumVoice(noiseBuf, DRUM_PARAMS.low),
+    clap: clapVoice(noiseBuf, CLAP_PARAMS),
   };
 }
 

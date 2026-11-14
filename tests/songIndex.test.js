@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs'; // Node標準のファイル操作
-import { parseSongIndex, pickSong } from '../src/songIndex.js';
+import { parseSongIndex, pickSong, restrictSongs, ADMIN_GROUP } from '../src/songIndex.js';
 
 const idx = parseSongIndex({ default: 'a', songs: [{ id: 'a', title: 'A' }, { id: 'b' }] });
 
@@ -32,4 +32,42 @@ test('songs/index.json: 形式が正しく、全曲のファイルが存在す�
   for (const s of index.songs) {
     assert.ok(existsSync(new URL(`../songs/${s.id}.txt`, import.meta.url)), `songs/${s.id}.txt がありません`);
   }
+});
+
+test('songs/index.json: 形式が正しく、全曲のファイルが存在する', () => {
+  const raw = JSON.parse(readFileSync(new URL('../songs/index.json', import.meta.url), 'utf8'));
+  const index = parseSongIndex(raw);
+  for (const s of index.songs) {
+    assert.ok(existsSync(new URL(`../songs/${s.id}.txt`, import.meta.url)), `songs/${s.id}.txt がありません`);
+  }
+});
+
+const gidx = parseSongIndex({
+  default: 'd',
+  songs: [{ id: 'a', groups: ['x', 'y'] }, { id: 'd' }, { id: 'b', groups: ['y'] }, { id: 'c' }],
+});
+const vis = (/** @type {string[]} */ v) => restrictSongs(gidx, v).index.songs.map((s) => s.id);
+
+test('parseSongIndex: groups は文字列配列。不正や予約語は例外', () => {
+  assert.deepEqual(gidx.songs[0].groups, ['x', 'y']);
+  assert.equal(gidx.songs[1].groups, undefined);
+  assert.throws(() => parseSongIndex({ default: 'a', songs: [{ id: 'a', groups: 'x' }] }), /groups が不正/);
+  assert.throws(() => parseSongIndex({ default: 'a', songs: [{ id: 'a', groups: ['../x'] }] }), /groups が不正/);
+  assert.throws(() => parseSongIndex({ default: 'a', songs: [{ id: 'a', groups: [ADMIN_GROUP] }] }), /予約語/);
+});
+
+test('restrictSongs: 未指定は default のみ / グループ指定は default + 該当グループ(一覧の順) / adminmami は全曲', () => {
+  assert.deepEqual(vis([]), ['d']);
+  assert.deepEqual(vis(['x']), ['a', 'd']);
+  assert.deepEqual(vis(['y']), ['a', 'd', 'b']);
+  assert.deepEqual(vis(['x,y']), ['a', 'd', 'b']);
+  assert.deepEqual(vis(['x', 'y']), ['a', 'd', 'b']);
+  assert.deepEqual(vis([ADMIN_GROUP]), ['a', 'd', 'b', 'c']);
+});
+
+test('restrictSongs: 未知のグループは警告して無視(default のみに戻る)', () => {
+  const r = restrictSongs(gidx, ['zzz']);
+  assert.deepEqual(r.index.songs.map((s) => s.id), ['d']);
+  assert.match(r.warnings[0].message, /zzz/);
+  assert.deepEqual(vis(['x,zzz']), ['a', 'd']);
 });

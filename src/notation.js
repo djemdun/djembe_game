@@ -24,6 +24,7 @@ export const NOTE_CHARS = Object.freeze({
   'タ': { sound: 'high', flam: false },
   'ロ': { sound: 'mid', flam: true },
   'ラ': { sound: 'high', flam: true },
+  'カ': { sound: 'clap', flam: false }, // クラップ。譜面では1ノーツ。左高と右高の同時打ちに展開される(chart.js)
 });
 
 const DEFAULT_BEATS_PER_BAR = 4;
@@ -31,6 +32,15 @@ const DEFAULT_BEATS_PER_BAR = 4;
 const BEATS_PER_CHAR = 0.5;
 /** 1行 = 2小節 */
 const BARS_PER_LINE = 2;
+
+/** 連符の長さ(文字数)の省略時の値。`3タタタ` = `3/4タタタ`(4文字 = 2拍に3音) */
+export const DEFAULT_TUPLET_SPAN = 4;
+
+/**
+ * 譜面の1要素。連符は「span 文字ぶんの時間に count 音を等間隔」(例: `3/4タタタ`)。
+ * @typedef {{ kind: 'char', ch: string, line: number }
+ *   | { kind: 'tuplet', count: number, span: number, chars: string[], line: number }} NotationItem
+ */
 
 const PART_HEADER = /^\[(.+?)\]\s*(.*)$/;
 export const AUTO_PLAY_KEYWORD = '自動音';
@@ -81,6 +91,61 @@ export function charsPerLine(beatsPerBar) {
 }
 
 /**
+ * 全角の数字・スラッシュを半角にする(連符の記法用)。
+ * @param {string} ch
+ */
+const halfWidth = (ch) => (ch === '／' ? '/' : /[０-９]/.test(ch) ? String.fromCharCode(ch.charCodeAt(0) - 0xfee0) : ch);
+const isDigit = (/** @type {string} */ ch) => /^[0-9]$/.test(halfWidth(ch));
+
+/**
+ * 1行ぶんの文字を要素に分ける。連符 `n/m` + 音n文字(mは省略可。省略時 DEFAULT_TUPLET_SPAN)を1要素にする。
+ * 連符は行をまたがない。音が足りない、数字が不正な連符は警告して捨てる(その分の時間は数えない)。
+ * @param {string[]} chars 空白を除いた1行
+ * @param {number} line
+ * @param {NotationWarning[]} warnings
+ * @returns {{ items: NotationItem[], length: number }} length = 占める時間(文字数換算)
+ */
+export function parseLineItems(chars, line, warnings) {
+  /** @type {NotationItem[]} */
+  const items = [];
+  let length = 0;
+  for (let i = 0; i < chars.length; i++) {
+    if (!isDigit(chars[i])) {
+      items.push({ kind: 'char', ch: chars[i], line });
+      length += 1;
+      continue;
+    }
+    let j = i;
+    let countText = '';
+    while (j < chars.length && isDigit(chars[j])) countText += halfWidth(chars[j++]);
+    let spanText = '';
+    const hasSpan = halfWidth(chars[j] ?? '') === '/';
+    if (hasSpan) {
+      j++;
+      while (j < chars.length && isDigit(chars[j])) spanText += halfWidth(chars[j++]);
+    }
+    const count = Number(countText);
+    const span = hasSpan ? Number(spanText) : DEFAULT_TUPLET_SPAN;
+    const written = chars.slice(i, j).join('');
+    const body = chars.slice(j, j + count);
+    const problem =
+      !(count >= 1) ? '音数が不正です'
+      : !(span >= 1) ? '長さ(文字数)が不正です'
+      : body.length < count || body.some(isDigit) ? `音が${count}個ありません`
+      : null;
+    if (problem) {
+      warnings.push({ line, message: `連符「${written}」を無視します(${problem}): ${chars.join('')}` });
+      i = j - 1; // 数字部分だけ読み飛ばし、後ろは通常の文字として続ける
+      continue;
+    }
+    items.push({ kind: 'tuplet', count, span, chars: body, line });
+    length += span;
+    i = j + count - 1;
+  }
+  return { items, length };
+}
+
+/**
  * @param {string} text 文字譜全体
  * @returns {ParsedNotation}
  * @throws {Error} BPM不正、パート外の譜面など、続行できない構造エラー
@@ -90,7 +155,7 @@ export function parseNotation(text) {
   const warnings = [];
   /** @type {{ title?: string, bpm?: number, beatsPerBar?: number }} */
   const header = {};
-  /** @type {{ name: string, repeat: number, autoPlay: boolean, chars: { ch: string, line: number }[], line: number }[]} */
+  /** @type {{ name: string, repeat: number, autoPlay: boolean, items: NotationItem[], length: number, line: number }[]} */
   const parts = [];
   let current = null;
 
@@ -110,7 +175,7 @@ export function parseNotation(text) {
         warnings.push({ line: lineNo, message: `繰り返し回数が0です。1回として扱います: ${line}` });
         repeat = 1;
       }
-      current = { name: partMatch[1], repeat, autoPlay: opts.autoPlay, chars: [], line: lineNo };
+      current = { name: partMatch[1], repeat, autoPlay: opts.autoPlay, items: [], length: 0, line: lineNo };
       parts.push(current);
       return;
     }
@@ -131,10 +196,12 @@ export function parseNotation(text) {
 
     const chars = [...line.replace(/[\s　]/g, '')];
     const expected = charsPerLine(header.beatsPerBar ?? DEFAULT_BEATS_PER_BAR);
-    if (chars.length !== expected) {
-      warnings.push({ line: lineNo, message: `1行は${expected}文字のはずですが${chars.length}文字です: ${line}` });
+    const parsed = parseLineItems(chars, lineNo, warnings);
+    if (parsed.length !== expected) {
+      warnings.push({ line: lineNo, message: `1行は${expected}文字のはずですが${parsed.length}文字です: ${line}` });
     }
-    for (const ch of chars) current.chars.push({ ch, line: lineNo });
+    current.items.push(...parsed.items);
+    current.length += parsed.length;
   });
 
   if (header.bpm === undefined || !Number.isFinite(header.bpm) || header.bpm <= 0) {
@@ -148,11 +215,11 @@ export function parseNotation(text) {
   const sections = [];
   let cursorBeat = 0;
   for (const part of parts) {
-    if (part.chars.length === 0) {
+    if (part.length === 0) {
       warnings.push({ line: part.line, message: `パート[${part.name}]に譜面がありません` });
     }
-    const partNotes = buildPartNotes(part.chars, warnings, part.autoPlay);
-    const partBeats = part.chars.length * BEATS_PER_CHAR;
+    const partNotes = buildPartNotes(part.items, warnings, part.autoPlay);
+    const partBeats = part.length * BEATS_PER_CHAR;
     sections.push({ beat: cursorBeat, name: part.name }); // x指定の繰り返しは最初の1回だけ
     for (let r = 0; r < part.repeat; r++) {
       for (const n of partNotes) notes.push({ ...n, beat: cursorBeat + n.beat });
@@ -173,26 +240,46 @@ export function parseNotation(text) {
 /**
  * 1パート分(繰り返し前)をパート先頭基準のbeatで内部形式にする。
  * 食い(前の小節にはみ出す音)も特別扱いせず、書かれた位置の奇偶で手が決まる。
- * @param {{ ch: string, line: number }[]} chars
+ * 連符は、先頭の手を開始位置の奇偶で決め、中は交互に叩く。連符の後ろの位置は span 文字ぶん進む。
+ * @param {NotationItem[]} items
  * @param {NotationWarning[]} warnings
  * @param {boolean} autoPlay
  * @returns {ChartNote[]}
  */
-function buildPartNotes(chars, warnings, autoPlay) {
+function buildPartNotes(items, warnings, autoPlay) {
   /** @type {ChartNote[]} */
   const out = [];
-  chars.forEach(({ ch, line }, i) => {
-    if (ch === REST_CHAR) return;
-    const def = NOTE_CHARS[ch];
-    if (!def) {
-      warnings.push({ line, message: `未対応の文字「${ch}」を休符として扱います` });
-      return;
-    }
-    const pos = i + 1;
-    /** @type {ChartNote} */
-    const note = { beat: i * BEATS_PER_CHAR, sound: def.sound, hand: assignHand(pos, def.flam), flam: def.flam };
+  /** @param {ChartNote} note */
+  const push = (note) => {
     if (autoPlay) note.autoPlay = true; // falseのときはキーを付けない(省略 = false)
     out.push(note);
-  });
+  };
+  /** @param {string} ch @param {number} line @returns {{ sound: Sound, flam: boolean } | null} */
+  const noteOf = (ch, line) => {
+    if (ch === REST_CHAR) return null;
+    const def = NOTE_CHARS[ch];
+    if (!def) warnings.push({ line, message: `未対応の文字「${ch}」を休符として扱います` });
+    return def ?? null;
+  };
+
+  let at = 0; // ここまでに占めた文字数(0始まりの位置)
+  for (const item of items) {
+    if (item.kind === 'char') {
+      const def = noteOf(item.ch, item.line);
+      if (def) push({ beat: at * BEATS_PER_CHAR, sound: def.sound, hand: assignHand(at + 1, def.flam), flam: def.flam });
+      at += 1;
+      continue;
+    }
+    const first = assignHand(at + 1, false);
+    item.chars.forEach((ch, k) => {
+      const def = noteOf(ch, item.line);
+      if (!def) return;
+      if (def.flam) warnings.push({ line: item.line, message: `連符の中ではフラム「${ch}」は使えません(通常の音として扱います)` });
+      const hand = k % 2 === 0 ? first : first === 'R' ? 'L' : 'R';
+      // 掛け算を先にして割る(2/3 などの丸め誤差を最小にする)
+      push({ beat: ((at * item.count + k * item.span) / item.count) * BEATS_PER_CHAR, sound: def.sound, hand, flam: false });
+    });
+    at += item.span;
+  }
   return out;
 }

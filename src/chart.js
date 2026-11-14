@@ -1,4 +1,4 @@
-import { LANES, FLAM_GAP_BEATS } from './constants.js';
+import { LANES, FLAM_GAP_BEATS, CLAP_LANE_SOUND } from './constants.js';
 
 /** @typedef {import('./types.js').Chart} Chart */
 /** @typedef {import('./types.js').ChartNote} ChartNote */
@@ -61,16 +61,27 @@ export function expandFlams(notes) {
 }
 
 /**
+ * クラップ(カ)を「左手と右手の同時打ち」の2ノーツに展開する。どちらも音は clap のまま、
+ * レーンは buildPlayNotes が CLAP_LANE_SOUND(左高と右高)に割り当てる。
+ * 手の指定(譜面の位置の奇偶)は両手になるので使わない。
+ * @param {ChartNote[]} notes
+ * @returns {ChartNote[]}
+ */
+export function expandClaps(notes) {
+  return notes.flatMap((n) => (n.sound === 'clap' ? [{ ...n, hand: /** @type {const} */ ('L') }, { ...n, hand: /** @type {const} */ ('R') }] : [n]));
+}
+
+/**
  * 内部形式 → 再生用ノーツ(時刻順)。判定側はこの結果だけを見る。
  * @param {Chart} chart
  * @param {number} leadInSec
  * @returns {PlayNote[]}
  */
 export function buildPlayNotes(chart, leadInSec) {
-  return expandFlams(chart.notes)
+  return expandClaps(expandFlams(chart.notes))
     .map((n) => ({
       time: leadInSec + beatToSec(n.beat, chart.bpm),
-      lane: laneOf(n.hand, n.sound),
+      lane: laneOf(n.hand, n.sound === 'clap' ? CLAP_LANE_SOUND : n.sound),
       sound: n.sound,
       autoPlay: n.autoPlay === true,
       result: /** @type {null} */ (null),

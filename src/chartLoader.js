@@ -1,6 +1,6 @@
 import { CHARTS } from './data/charts.js';
 import { parseNotation } from './notation.js';
-import { parseSongIndex, pickSong } from './songIndex.js';
+import { parseSongIndex, pickSong, restrictSongs } from './songIndex.js';
 
 /** @typedef {import('./types.js').Chart} Chart */
 /** @typedef {import('./notation.js').NotationWarning} NotationWarning */
@@ -33,6 +33,7 @@ export async function loadSong(id) {
 
 /**
  * 曲を決めて読み込む(fetchを伴うので notation.js / songIndex.js とは分離)。速さ倍率は呼び出し側で掛ける。
+ * ?group= で見える曲を絞る(restrictSongs。未指定は default のみ)。
  * 順序: ?chart= が easy/demo → 内蔵譜面 / それ以外 → songs/index.json の一覧で検証 → songs/<id>.txt。
  * 失敗したら default → それも失敗なら demo に戻し、理由を warnings に入れて開始画面に出す。
  * @param {URLSearchParams} params
@@ -58,8 +59,11 @@ export async function loadChart(params) {
 
   let index;
   try {
-    index = parseSongIndex(await (await fetchOk(INDEX_URL)).json());
+    const full = parseSongIndex(await (await fetchOk(INDEX_URL)).json());
+    const restricted = restrictSongs(full, params.getAll('group'));
+    index = restricted.index;
     songs = index.songs;
+    for (const w of restricted.warnings) warn(w.message);
   } catch (e) {
     warn(`曲一覧(${INDEX_URL})を読めないため demo を使います: ${reason(e)}`);
     return demo();
