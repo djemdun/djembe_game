@@ -69,8 +69,21 @@ export const THEME = {
     handDivider: '#4a5163', // 左手と右手の境目(中央の線)
   },
 
-  // 判定ライン
-  judgeLine: '#ffffff',
+  // 判定ライン(普段は少し暗くして、叩いたときの光が見えるようにする)
+  judgeLine: 'rgba(255, 255, 255, 0.55)',
+
+  // 叩いたときに判定ラインと判定帯が一瞬光る。色は PERFECT/GOOD 共通の1色で、強さだけ変える
+  judgeFlash: {
+    color: '#fcd66f', // 光の色(金)
+    PERFECT: {
+      bandAlpha: 0.5, // PERFECT のとき、判定帯(GOOD の範囲)の塗りの最大不透明度(時間とともに薄くなる)
+      lineAlpha: 1, // PERFECT のとき、光るラインの最大不透明度
+    },
+    GOOD: {
+      bandAlpha: 0.2, // GOOD のとき、判定帯の塗りの最大不透明度
+      lineAlpha: 0.6, // GOOD のとき、光るラインの最大不透明度
+    },
+  },
 
   // 画面下部のキー表示の帯
   keyStrip: {

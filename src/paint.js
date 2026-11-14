@@ -110,6 +110,36 @@ export function drawBands(g, { x, w, goodTop, goodBottom, perfectTop, perfectBot
 }
 
 /**
+ * 叩いたレーンの判定帯を、金色で一瞬光らせる(時間とともに薄くなる)。
+ * @param {CanvasRenderingContext2D} g
+ * @param {{ x: number, w: number, top: number, bottom: number, result: 'PERFECT' | 'GOOD', progress: number }} p progress 0..1
+ */
+export function drawBandFlash(g, { x, w, top, bottom, result, progress }) {
+  g.save();
+  g.globalAlpha = THEME.judgeFlash[result].bandAlpha * (1 - progress);
+  g.fillStyle = THEME.judgeFlash.color;
+  g.fillRect(x, top, w, bottom - top);
+  g.restore();
+}
+
+/**
+ * 叩いたレーンの判定ラインを、金色で太く光らせる(普段のラインの上に重ね、時間とともに薄くなる)。
+ * @param {CanvasRenderingContext2D} g
+ * @param {{ x: number, w: number, y: number, result: 'PERFECT' | 'GOOD', progress: number }} p progress 0..1
+ */
+export function drawLineFlash(g, { x, w, y, result, progress }) {
+  g.save();
+  g.globalAlpha = THEME.judgeFlash[result].lineAlpha * (1 - progress);
+  g.strokeStyle = THEME.judgeFlash.color;
+  g.lineWidth = result === 'PERFECT' ? 6 : 4; // 普段のラインは3
+  g.beginPath();
+  g.moveTo(x, y);
+  g.lineTo(x + w, y);
+  g.stroke();
+  g.restore();
+}
+
+/**
  * 拍線1本。
  * @param {CanvasRenderingContext2D} g
  * @param {number} x 左端

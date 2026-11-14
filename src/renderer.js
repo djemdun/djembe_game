@@ -3,7 +3,7 @@ import { computeLayout } from './layout.js';
 import { drumLayout, activeGlows } from './drum.js';
 import { THEME } from './theme.js';
 import {
-  drawBackground, drawLane, drawLaneLines, drawBands, drawBeatLine, drawNote,
+  drawBackground, drawLane, drawLaneLines, drawBands, drawBandFlash, drawLineFlash, drawBeatLine, drawNote,
   drawHitEffect, drawDrumBase, drawDrumGlow, drawJudgeLine,
 } from './paint.js';
 import { windowBands, zoneOfNote } from './judge.js';
@@ -100,6 +100,18 @@ export class Renderer {
 
     drawBackground(g, cssW, cssH);
 
+    // バー(判定ラインと判定帯)全体の光: 直近に叩いた結果の色。ヒットリングと同じ条件・長さ
+    /** @type {{ result: 'PERFECT' | 'GOOD', progress: number } | null} */
+    let flash = null;
+    let flashAt = -Infinity;
+    for (const fx of game.laneEffects) {
+      if (!fx || fx.at <= flashAt) continue;
+      const age = t - fx.at;
+      if (age < 0 || age >= HIT_EFFECT_SEC) continue;
+      flashAt = fx.at;
+      flash = { result: fx.result, progress: age / HIT_EFFECT_SEC };
+    }
+
     // レーン(叩いた直後は音の色で光る)
     for (let i = 0; i < LANE_COUNT; i++) {
       drawLane(g, { index: i, x: x0 + i * laneW, w: laneW, h: cssH, sound: LANES[i].sound, ageSec: t - game.laneHitAt[i] });
@@ -118,6 +130,7 @@ export class Renderer {
       const [gTop, gBottom] = bandY(bands.good);
       const [pTop, pBottom] = bandY(bands.perfect);
       drawBands(g, { x: x0, w: areaW, goodTop: gTop, goodBottom: gBottom, perfectTop: pTop, perfectBottom: pBottom });
+      if (flash) drawBandFlash(g, { x: x0, w: areaW, top: gTop, bottom: gBottom, result: flash.result, progress: flash.progress });
     }
 
     // 拍線(ノーツより下に描く。小節頭は濃く、他の拍は薄く)
@@ -150,6 +163,7 @@ export class Renderer {
 
     // 判定ライン
     drawJudgeLine(g, x0, areaW, judgeY);
+    if (flash) drawLineFlash(g, { x: x0, w: areaW, y: judgeY, result: flash.result, progress: flash.progress });
 
     // 下部ラベル(キー/音/手)
     g.fillStyle = THEME.keyStrip.background;
