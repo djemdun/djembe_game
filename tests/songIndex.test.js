@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs'; // Node標準のファイル操作
-import { parseSongIndex, pickSong, restrictSongs, ADMIN_GROUP } from '../src/songIndex.js';
+import { parseSongIndex, pickSong, restrictSongs, groupDefaultSong, ADMIN_GROUP } from '../src/songIndex.js';
 
 const idx = parseSongIndex({ default: 'a', songs: [{ id: 'a', title: 'A' }, { id: 'b' }] });
 
@@ -70,4 +70,52 @@ test('restrictSongs: 未知のグループは警告して無視(default のみ�
   assert.deepEqual(r.index.songs.map((s) => s.id), ['d']);
   assert.match(r.warnings[0].message, /zzz/);
   assert.deepEqual(vis(['x,zzz']), ['a', 'd']);
+});
+
+// ---- グループごとの既定曲(groupDefaults) ----
+const ddx = parseSongIndex({
+  default: 'd',
+  groupDefaults: { x: 'a', y: 'b' },
+  songs: [{ id: 'a', groups: ['x', 'y'] }, { id: 'd' }, { id: 'b', groups: ['y'] }, { id: 'c', groups: ['z'] }],
+});
+
+test('parseSongIndex: groupDefaults は曲がそのグループに属していること。不正は例外', () => {
+  assert.deepEqual(ddx.groupDefaults, { x: 'a', y: 'b' });
+  assert.equal(idx.groupDefaults, undefined);
+  const base = { default: 'd', songs: [{ id: 'a', groups: ['x'] }, { id: 'd' }] };
+  assert.throws(() => parseSongIndex({ ...base, groupDefaults: [] }), /オブジェクト/);
+  assert.throws(() => parseSongIndex({ ...base, groupDefaults: { x: 'zzz' } }), /含まれていません/);
+  assert.throws(() => parseSongIndex({ ...base, groupDefaults: { y: 'a' } }), /属していません/);
+  assert.throws(() => parseSongIndex({ ...base, groupDefaults: { x: 'd' } }), /属していません/);
+  assert.throws(() => parseSongIndex({ ...base, groupDefaults: { [ADMIN_GROUP]: 'a' } }), /予約語/);
+});
+
+test('groupDefaultSong: 指定した順で最初に既定曲があるグループ。なし・未指定・adminmami は null', () => {
+  assert.equal(groupDefaultSong(ddx, ['x']), 'a');
+  assert.equal(groupDefaultSong(ddx, ['y']), 'b');
+  assert.equal(groupDefaultSong(ddx, ['y,x']), 'b');
+  assert.equal(groupDefaultSong(ddx, ['x', 'y']), 'a');
+  assert.equal(groupDefaultSong(ddx, ['z,x']), 'a'); // z には既定曲がないので次の x
+  assert.equal(groupDefaultSong(ddx, ['z']), null);
+  assert.equal(groupDefaultSong(ddx, []), null);
+  assert.equal(groupDefaultSong(ddx, [ADMIN_GROUP, 'x']), null);
+  assert.equal(groupDefaultSong(ddx, ['constructor']), null);
+  assert.equal(groupDefaultSong(idx, ['x']), null); // groupDefaults なし
+});
+
+test('restrictSongs: groupDefaults を保つ / pickSong: fallback を既定曲として使う', () => {
+  assert.deepEqual(restrictSongs(ddx, ['x']).index.groupDefaults, { x: 'a', y: 'b' });
+  assert.deepEqual(pickSong(ddx, null, 'b'), { id: 'b', warnings: [] });
+  assert.deepEqual(pickSong(ddx, 'c', 'b'), { id: 'c', warnings: [] });
+  const r = pickSong(ddx, 'zzz', 'b');
+  assert.equal(r.id, 'b');
+  assert.match(r.warnings[0].message, /既定の"b"/);
+});
+
+test('songs/index.json: groupDefaults の曲が、そのグループで見える', () => {
+  const index = parseSongIndex(JSON.parse(readFileSync(new URL('../songs/index.json', import.meta.url), 'utf8')));
+  for (const [group, id] of Object.entries(index.groupDefaults ?? {})) {
+    assert.ok(restrictSongs(index, [group]).index.songs.some((x) => x.id === id), `${group} で ${id} が見えません`);
+    assert.equal(groupDefaultSong(index, [group]), id);
+  }
 });

@@ -53,16 +53,38 @@ test('loadChart: group=<名前> は default + そのグループの曲。複数�
   );
 });
 
-test('loadChart: ?chart= は見える曲の中でだけ有効(見えない曲は警告して default)', async () => {
+/** グループの既定曲(groupDefaults)。なければ default */
+const startOf = (/** @type {string} */ g) => INDEX.groupDefaults?.[g] ?? INDEX.default;
+
+test('loadChart: ?chart= は見える曲の中でだけ有効(見えない曲は警告してグループの既定曲)', async () => {
   const g = groupNames[0];
   const inside = SONGS.find((s) => s.groups?.includes(g) && existsSync(new URL(`../songs/${s.id}.txt`, import.meta.url)))?.id ?? INDEX.default;
   const outside = SONGS.find((s) => s.id !== INDEX.default && !s.groups?.includes(g))?.id;
   assert.equal((await loadChart(params(`group=${g}&chart=${inside}`))).id, inside);
   if (outside) {
     const ng = await loadChart(params(`group=${g}&chart=${outside}`));
-    assert.equal(ng.id, INDEX.default);
+    assert.equal(ng.id, startOf(g));
     assert.match(ng.warnings[0].message, new RegExp(`${outside}.*一覧にありません`));
   }
+});
+
+test('loadChart: ?group= だけなら、そのグループの既定曲(groupDefaults)で始まる。選択欄には default も並ぶ', async () => {
+  for (const g of Object.keys(INDEX.groupDefaults ?? {})) {
+    const r = await loadChart(params(`group=${g}`));
+    assert.equal(r.id, INDEX.groupDefaults[g], g);
+    assert.ok(ids(r.songs).includes(INDEX.default), g);
+  }
+  // 既定曲のないグループ・group なしは default のまま
+  assert.equal((await loadChart(params(''))).id, INDEX.default);
+});
+
+test('loadChart: グループの既定曲が読めなければ警告して全体の default に戻る', async () => {
+  const g = Object.keys(INDEX.groupDefaults ?? {})[0];
+  if (!g) return;
+  missing.add(`songs/${INDEX.groupDefaults[g]}.txt`);
+  const r = await loadChart(params(`group=${g}`));
+  assert.equal(r.id, INDEX.default);
+  assert.ok(r.warnings.some((w) => w.message.includes(`既定の曲"${INDEX.default}"を使います`)));
 });
 
 test('loadChart: 内蔵譜面(?chart=easy)は一覧なし(選択欄を出さない)', async () => {

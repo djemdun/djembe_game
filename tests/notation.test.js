@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseNotation, assignHand } from '../src/notation.js';
+import { parseNotation, parsePartOptions, assignHand } from '../src/notation.js';
 import { buildPlayNotes, withSpeed } from '../src/chart.js';
 
 const HEADER = 'タイトル: T\nBPM: 120\n拍子: 4\n';
@@ -188,14 +188,14 @@ test('sections: パートの開始位置と名前。x指定の繰り返しは最
   ]);
 });
 
-test('songs/djole.txt: 62小節・警告なし・構成どおり(合図→オープニング→キメ→伴奏１x3→…→エンディング→キメ)', () => {
-  const r = parseNotation(readFileSync(new URL('../songs/djole.txt', import.meta.url), 'utf8'));
+test('tests/fixtures/djole.txt(songs/djole.txt のコピー。本物の曲は変わるのでテストはこちらを使う): 58小節・警告なし・構成どおり(合図→オープニング→キメ→伴奏１x3→伴奏１ラスト→伴奏２x3→伴奏２ラスト→エンディング→キメ)', () => {
+  const r = parseNotation(readFileSync(new URL('./fixtures/djole.txt', import.meta.url), 'utf8'));
   assert.equal(r.title, 'Djole');
   assert.equal(r.bpm, 160);
   assert.equal(r.beatsPerBar, 4);
   assert.deepEqual(r.warnings, []);
-  assert.equal(r.totalBeats / r.beatsPerBar, 62);
-  assert.equal(r.chart.notes.length, 266);
+  assert.equal(r.totalBeats / r.beatsPerBar, 58);
+  assert.equal(r.chart.notes.length, 247);
   // 冒頭の「ロ」= 位置1 の中音フラム → 本音は左
   assert.deepEqual(r.chart.notes[0], { beat: 0, sound: 'mid', hand: 'L', flam: true, autoPlay: true });
   // オープニングの頭は 合図(4拍×2小節=8拍)の直後
@@ -208,11 +208,10 @@ test('songs/djole.txt: 62小節・警告なし・構成どおり(合図→オー
     { beat: 72, name: 'キメ' },
     { beat: 88, name: '伴奏１' },
     { beat: 112, name: '伴奏１ラスト' },
-    { beat: 120, name: 'キメ' },
-    { beat: 136, name: '伴奏２' },
-    { beat: 160, name: '伴奏２ラスト' },
-    { beat: 168, name: 'エンディング' },
-    { beat: 232, name: 'キメ' },
+    { beat: 120, name: '伴奏２' },
+    { beat: 144, name: '伴奏２ラスト' },
+    { beat: 152, name: 'エンディング' },
+    { beat: 216, name: 'キメ' },
   ]);
   // 自動音は最初の合図(9ノーツ)だけ
   const auto = r.chart.notes.filter((n) => n.autoPlay);
@@ -271,4 +270,47 @@ test('連符: 音が足りない・数字が不正・フラム入りは警告', 
   const flam = parseBody('[A]\n3ロタタッッッッッッッッッッッッ');
   assert.match(flam.warnings[0].message, /連符の中ではフラム/);
   assert.equal(flam.chart.notes.every((n) => !n.flam), true);
+});
+
+// ---- 順手(休符を数えず、叩く音だけで交互にする) ----
+/** 1行16文字になるよう休符で埋める */
+const pad = (/** @type {string} */ body) => body + 'ッ'.repeat(16 - [...body].length);
+const handsOf = (/** @type {string} */ head, /** @type {string} */ body) =>
+  parseNotation(`${HEADER}\n[A]${head}\n${pad(body)}`).chart.notes.map((n) => n.hand).join('');
+
+test('順手: parsePartOptions(指定なしは null、括弧で最初の手、全角括弧・x・自動音と併用)', () => {
+  assert.equal(parsePartOptions('').sequential, null);
+  assert.equal(parsePartOptions(' 順手').sequential, 'R');
+  assert.equal(parsePartOptions('順手(左)').sequential, 'L');
+  assert.equal(parsePartOptions('順手（右）').sequential, 'R');
+  assert.equal(parsePartOptions('順手 ( L )').sequential, 'L');
+  const o = parsePartOptions('x3 順手(左) 自動音');
+  assert.deepEqual([o.repeat, o.autoPlay, o.sequential, o.unknown], [3, true, 'L', []]);
+});
+
+test('順手: 休符を数えず交互(指定なしは位置の奇偶なので同じ手が続く)', () => {
+  const body = 'ドッドッッドッッド'; // 位置 1,3,6,9
+  assert.equal(handsOf(' 順手', body), 'RLRL');
+  assert.equal(handsOf(' 順手(左)', body), 'LRLR');
+  assert.equal(handsOf('', body), 'RRLR');
+});
+
+test('順手: フラムは前打音=次の手・本音=反対、次の音は前打音と同じ手', () => {
+  const r = parseNotation(`${HEADER}\n[A] 順手\n${pad('ドロド')}`);
+  assert.deepEqual(r.chart.notes.map((n) => [n.hand, n.flam]), [['R', false], ['R', true], ['L', false]]); // ド(R) → ロ(前打音L・本音R) → ド(L)
+});
+
+test('順手: クラップは手を進めない', () => {
+  const r = parseNotation(`${HEADER}\n[A] 順手\n${pad('ドカド')}`);
+  assert.deepEqual(r.chart.notes.map((n) => n.sound), ['low', 'clap', 'low']);
+  assert.deepEqual([r.chart.notes[0].hand, r.chart.notes[2].hand], ['R', 'L']);
+});
+
+test('順手: 連符の先頭は直前の音の反対の手で、中も交互。後ろの音はその続き', () => {
+  assert.equal(handsOf(' 順手', 'ド3タタタド'), 'RLRLR');
+});
+
+test('順手: パートごとに最初の手から数え直す。指定なしのパートは従来どおり', () => {
+  const r = parseNotation(`${HEADER}\n[A] 順手\n${pad('ドドド')}\n[B]\n${pad('ッドッド')}`);
+  assert.deepEqual(r.chart.notes.map((n) => n.hand), ['R', 'L', 'R', 'L', 'L']);
 });

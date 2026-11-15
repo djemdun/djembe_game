@@ -44,16 +44,25 @@ export const DEFAULT_TUPLET_SPAN = 4;
 
 const PART_HEADER = /^\[(.+?)\]\s*(.*)$/;
 export const AUTO_PLAY_KEYWORD = '自動音';
+/** `順手` / `順手(左)` / `順手（右）`。休符を数えず、叩く音だけで交互にする。括弧で最初の手を指定(省略時は右) */
+const SEQUENTIAL_HAND = /順手(?:\s*[（(]\s*([左右LRlr])\s*[）)])?/;
 const HEADER_LINE = /^(タイトル|BPM|拍子)\s*[:：]\s*(.*)$/i;
 
 /**
- * パート名の後ろの指定(例: "x8" / "自動音" / "自動音 x2" / "x2 自動音")を読む。順不同。
+ * パート名の後ろの指定(例: "x8" / "自動音" / "順手(左)" / "自動音 x2" / "x2 自動音")を読む。順不同。
  * @param {string} rest `[名前]` より後ろの文字列
- * @returns {{ repeat: number, autoPlay: boolean, unknown: string[] }}
+ * @returns {{ repeat: number, autoPlay: boolean, sequential: Hand | null, unknown: string[] }} sequential = 順手の最初の手(指定なしは null)
  */
 export function parsePartOptions(rest) {
   let repeat = 1;
   let autoPlay = false;
+  /** @type {Hand | null} */
+  let sequential = null;
+  const seq = SEQUENTIAL_HAND.exec(rest);
+  if (seq) {
+    sequential = seq[1] === '左' || /^[lL]$/.test(seq[1] ?? '') ? 'L' : 'R';
+    rest = rest.replace(SEQUENTIAL_HAND, ' ');
+  }
   /** @type {string[]} */
   const unknown = [];
   // "x 8" のような空白入りも "x8" として扱う
@@ -63,7 +72,7 @@ export function parsePartOptions(rest) {
     else if (tok === AUTO_PLAY_KEYWORD) autoPlay = true;
     else unknown.push(tok);
   }
-  return { repeat, autoPlay, unknown };
+  return { repeat, autoPlay, sequential, unknown };
 }
 
 /**
@@ -155,7 +164,7 @@ export function parseNotation(text) {
   const warnings = [];
   /** @type {{ title?: string, bpm?: number, beatsPerBar?: number }} */
   const header = {};
-  /** @type {{ name: string, repeat: number, autoPlay: boolean, items: NotationItem[], length: number, line: number }[]} */
+  /** @type {{ name: string, repeat: number, autoPlay: boolean, sequential: Hand | null, items: NotationItem[], length: number, line: number }[]} */
   const parts = [];
   let current = null;
 
@@ -175,7 +184,7 @@ export function parseNotation(text) {
         warnings.push({ line: lineNo, message: `繰り返し回数が0です。1回として扱います: ${line}` });
         repeat = 1;
       }
-      current = { name: partMatch[1], repeat, autoPlay: opts.autoPlay, items: [], length: 0, line: lineNo };
+      current = { name: partMatch[1], repeat, autoPlay: opts.autoPlay, sequential: opts.sequential, items: [], length: 0, line: lineNo };
       parts.push(current);
       return;
     }
@@ -218,7 +227,7 @@ export function parseNotation(text) {
     if (part.length === 0) {
       warnings.push({ line: part.line, message: `パート[${part.name}]に譜面がありません` });
     }
-    const partNotes = buildPartNotes(part.items, warnings, part.autoPlay);
+    const partNotes = buildPartNotes(part.items, warnings, part.autoPlay, part.sequential);
     const partBeats = part.length * BEATS_PER_CHAR;
     sections.push({ beat: cursorBeat, name: part.name }); // x指定の繰り返しは最初の1回だけ
     for (let r = 0; r < part.repeat; r++) {
@@ -244,9 +253,10 @@ export function parseNotation(text) {
  * @param {NotationItem[]} items
  * @param {NotationWarning[]} warnings
  * @param {boolean} autoPlay
+ * @param {Hand | null} sequential 順手の最初の手。null = 位置の奇偶で決める(休符も数える)
  * @returns {ChartNote[]}
  */
-function buildPartNotes(items, warnings, autoPlay) {
+function buildPartNotes(items, warnings, autoPlay, sequential) {
   /** @type {ChartNote[]} */
   const out = [];
   /** @param {ChartNote} note */
@@ -262,20 +272,41 @@ function buildPartNotes(items, warnings, autoPlay) {
     return def ?? null;
   };
 
+  // 順手: 休符を数えず、叩く音だけで交互にする。nextHand = 次に叩く音の手
+  /** @type {Hand} */
+  let nextHand = sequential ?? 'R';
+  const flip = (/** @type {Hand} */ h) => (h === 'R' ? 'L' : 'R');
+  /**
+   * 音1つの手を決める。順手でなければ位置の奇偶(assignHand)。
+   * 順手: 通常の音は nextHand で、次は反対の手。フラムは前打音が nextHand・本音が反対で、次は前打音と同じ手。
+   * クラップは両手なので手を進めない
+   * @param {number} pos 1始まりの文字位置
+   * @param {{ sound: Sound, flam: boolean }} def
+   * @returns {Hand}
+   */
+  const handOf = (pos, def) => {
+    if (sequential === null) return assignHand(pos, def.flam);
+    if (def.sound === 'clap') return nextHand;
+    if (def.flam) return flip(nextHand); // 本音。次の音は nextHand のまま(= 前打音と同じ手)
+    const h = nextHand;
+    nextHand = flip(h);
+    return h;
+  };
+
   let at = 0; // ここまでに占めた文字数(0始まりの位置)
   for (const item of items) {
     if (item.kind === 'char') {
       const def = noteOf(item.ch, item.line);
-      if (def) push({ beat: at * BEATS_PER_CHAR, sound: def.sound, hand: assignHand(at + 1, def.flam), flam: def.flam });
+      if (def) push({ beat: at * BEATS_PER_CHAR, sound: def.sound, hand: handOf(at + 1, def), flam: def.flam });
       at += 1;
       continue;
     }
-    const first = assignHand(at + 1, false);
+    const first = assignHand(at + 1, false); // 順手では使わない
     item.chars.forEach((ch, k) => {
       const def = noteOf(ch, item.line);
       if (!def) return;
       if (def.flam) warnings.push({ line: item.line, message: `連符の中ではフラム「${ch}」は使えません(通常の音として扱います)` });
-      const hand = k % 2 === 0 ? first : first === 'R' ? 'L' : 'R';
+      const hand = sequential !== null ? handOf(at + 1, { sound: def.sound, flam: false }) : k % 2 === 0 ? first : flip(first);
       // 掛け算を先にして割る(2/3 などの丸め誤差を最小にする)
       push({ beat: ((at * item.count + k * item.span) / item.count) * BEATS_PER_CHAR, sound: def.sound, hand, flam: false });
     });

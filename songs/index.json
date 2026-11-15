@@ -1,5 +1,6 @@
 {
   "default": "standard",
+  "groupDefaults": { "shinakura": "fra", "singha4": "djole" },
   "songs": [
     { "id": "standard", "title": "Standard" },
     { "id": "fra", "title": "Fra", "groups": ["shinakura"] },
