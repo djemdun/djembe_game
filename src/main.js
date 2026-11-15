@@ -12,8 +12,13 @@ import { Renderer } from './renderer.js';
 import { loadOffsetMs, saveOffsetMs, loadSettings, saveSettings } from './storage.js';
 import { createUi } from './ui.js';
 import { loadChart, loadSong } from './chartLoader.js';
+import { APP_VERSION } from './version.js';
 
 const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('game'));
+
+// 「更新されない場合」に出す版表記(読み込まれたJSの版。古いJSが残っていれば古い値が出る)
+const versionEl = document.getElementById('app-version');
+if (versionEl) versionEl.textContent = APP_VERSION;
 /** 起動時に読み込みを開始。開始ボタンまでに終わっていれば待ち時間なし */
 const params = new URLSearchParams(location.search);
 const urlSpeed = parseSpeedParam(params.get('speed'));

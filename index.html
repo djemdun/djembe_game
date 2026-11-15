@@ -62,9 +62,38 @@
       <output id="offset-output"></output>
       <p class="hint">遅れて叩いている/音が遅れて聞こえるなら＋、早いなら−。プレイ中の「+23ms」表示が目安(平均が0に近づくよう調整)</p>
     </div>
+
+    <details id="stale-help" class="stale-help">
+      <summary>更新されない場合(画面が古い・エラーが出る)</summary>
+      <p>ブラウザに古いデータが残っています。お使いの端末の手順で消してから、一番下のボタンで読み込み直してください。</p>
+      <h3>iPhone / iPad(Safari)</h3>
+      <ol>
+        <li>「設定」→「アプリ」→「Safari」→「詳細」→「Webサイトデータ」(iOS 17 以前は「設定」→「Safari」→「詳細」)</li>
+        <li>検索欄に <b>github</b> と入れ、出てきた <b>github.io</b> を左にスワイプして削除</li>
+        <li>見つからなければ、「Safari」の画面の「履歴とWebサイトデータを消去」</li>
+      </ol>
+      <h3>Android(Chrome)</h3>
+      <ol>
+        <li>右上の「︙」→「履歴」→「閲覧履歴データを削除」</li>
+        <li>期間は「全期間」、「キャッシュされた画像とファイル」にチェックして削除</li>
+      </ol>
+      <h3>パソコン(Chrome / Edge / Firefox)</h3>
+      <ol>
+        <li><b>Ctrl + Shift + Delete</b>(Mac は <b>Cmd + Shift + Delete</b>)</li>
+        <li>期間は「全期間」、「キャッシュ(キャッシュされた画像とファイル)」にチェックして削除</li>
+        <li>Mac の Safari は「Safari」→「設定」→「プライバシー」→「Webサイトデータを管理」</li>
+      </ol>
+      <p class="note"><b>github.io</b> のデータを消すと、他の GitHub Pages のサイトの保存データも消えます。このゲームの設定(判定オフセットなど)も初期化されるので、読み込み直した後に入れ直してください。</p>
+      <button id="reload-btn" type="button">消したら、ここを押して読み込み直す</button>
+      <p class="version">版: <span id="app-version">-</span></p>
+    </details>
    </div>
   </div>
 
+  <script>
+    // 古いJSが残っていても動くよう、モジュールではなくここに直接書く
+    document.getElementById('reload-btn').addEventListener('click', () => location.reload());
+  </script>
   <script type="module" src="src/main.js"></script>
 </body>
 </html>

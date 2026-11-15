@@ -97,6 +97,12 @@
 - テスト対象: 手の割り当て、フラムの偶奇、繰り返し、行の文字数チェック
 - 純粋ロジック(`chart.js` / `beats.js` / `notation.js` / `settings.js` / `judge.js` / `constants.js`)はDOM・AudioContextに触れない。`game.js` も時刻を引数で受け取り、自前で時計を持たない
 
+## 更新されない場合(キャッシュ)
+- 静的公開(GitHub Pages)では HTTP ヘッダーを変えられず、ブラウザが古い JS/CSS を保持して、楽譜(fetch)だけ新しい、というずれが起きる(例: 新しい `順手` を古いパーサーが「未対応」と警告)。iPad に限らず全ブラウザで起こる
+- TOP画面の一番下に折りたたみ「更新されない場合」(`#stale-help`)。端末別のキャッシュ削除手順 + 「読み込み直す」ボタン(インライン `<script>` で `location.reload()`。JS が古くても動くようにモジュールにしない)+ 版表記(`src/version.js` の `APP_VERSION`)
+- 公開のたびに `APP_VERSION` を上げる。画面の版が古ければ古い JS が読まれている目印になる
+- 将来の対策候補: 曲データの `fetch` に `cache: 'no-cache'`、import map による JS/CSS のバージョン付け(要: 全モジュールを載せるテスト)
+
 ## 色の管理
 - ゲーム画面(canvas)の色は `src/theme.js` の `THEME` に集約する。各値に「何を変えるものか」のコメントがある。`renderer.js` / `paint.js` に色を直書きしない(DOM側の色は `style.css`)
 - `THEME` は毎フレーム読み直す(キャッシュしない)ので、実行時に書き換えると次のフレームから反映される。これが色の調整ページの前提
@@ -112,6 +118,7 @@ src/
   constants.js  レーン定義・判定窓・スコア・曲ランク基準・タイミング定数
   chart.js      内部形式 → 再生用ノーツ、withSpeed(速さ倍率)(純粋)
   beats.js      拍の時刻計算 gridOf/leadInSec/beatsInWindow(純粋。拍音と拍線が共用)
+  version.js    版表記 APP_VERSION(公開のたびに手で上げる。TOPの「更新されない場合」に出る)
   settings.js   設定の型・既定値・検証、?speed=の解釈(純粋)
   scheduler.js  先読みスケジューラ(拍音・自動音で共用)
   autoplay.js   自動音の選別と時刻窓(純粋)
